@@ -46,7 +46,7 @@ Si no se menciona fecha/hora, deja esos campos en null (no inventes).
 Texto del usuario: "${texto}"`;
 
   try {
-    const respuesta = await fetch('https://ai-gateway.vercel.sh/v1/ai', {
+    const respuesta = await fetch('https://ai-gateway.vercel.sh/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -56,6 +56,7 @@ Texto del usuario: "${texto}"`;
         model: 'anthropic/claude-haiku-4-5',
         max_tokens: 500,
         messages: [{ role: 'user', content: instrucciones }],
+        stream: false,
       }),
     });
 
@@ -66,7 +67,7 @@ Texto del usuario: "${texto}"`;
     }
 
     const datos = await respuesta.json();
-    const textoRespuesta = datos.content?.[0]?.text || '';
+    const textoRespuesta = datos.choices?.[0]?.message?.content || '';
 
     // Limpiar por si la IA envuelve el JSON en ```json ... ```
     const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
