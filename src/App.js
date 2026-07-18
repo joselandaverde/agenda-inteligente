@@ -430,6 +430,7 @@ export default function App() {
         setMinutos(String(datos.minutos).padStart(2, '0'));
       }
       if (datos.ampm) setAmpm(datos.ampm);
+      if (datos.duracionMinutos) setTiempoEstimado(String(datos.duracionMinutos));
 
       setMensajeIA('Listo — revisa los campos antes de crear.');
       setTextoLibre('');
@@ -532,6 +533,8 @@ export default function App() {
       datos.participantes = participantes
         ? participantes.split(',').map((p) => p.trim())
         : null;
+      const tr = parseInt(tiempoEstimado, 10);
+      datos.time_estimated = !isNaN(tr) && tr > 0 ? tr : 30;
     }
 
     if (tipo === 'Tarea') {
@@ -1171,6 +1174,15 @@ export default function App() {
             placeholder="Participantes (separados por comas)"
             style={{ ...estiloCampo, width: '100%', marginRight: 0 }}
           />
+          <label style={{ fontSize: '14px', display: 'block', marginTop: '6px' }}>
+            Duración (minutos):
+            <input
+              type="number"
+              value={tiempoEstimado}
+              onChange={(e) => setTiempoEstimado(e.target.value)}
+              style={{ ...estiloHora, marginLeft: '8px', width: '80px' }}
+            />
+          </label>
         </div>
       )}
 
@@ -1737,6 +1749,11 @@ export default function App() {
                 {t.type === 'Tarea' && subs.length === 0 && t.time_estimated && (
                   <div style={{ fontSize: '12px', color: '#555', marginTop: '4px' }}>
                     ⏱ {t.time_estimated} min estimados
+                  </div>
+                )}
+                {t.type === 'Reunión' && t.time_estimated && (
+                  <div style={{ fontSize: '12px', color: '#555', marginTop: '4px' }}>
+                    ⏱ Dura {t.time_estimated} min
                   </div>
                 )}
                 {t.repetition && t.repetition !== 'Ninguna' && (
