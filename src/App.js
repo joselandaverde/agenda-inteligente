@@ -7,6 +7,9 @@ export default function App() {
   const [cargando, setCargando] = useState(true);
 
   const [tarea, setTarea] = useState('');
+  const [textoLibre, setTextoLibre] = useState('');
+  const [interpretando, setInterpretando] = useState(false);
+  const [mensajeIA, setMensajeIA] = useState('');
   const [tipo, setTipo] = useState('Tarea');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
 
@@ -388,6 +391,54 @@ export default function App() {
     setMostrarPegarListaTemp(false);
   }
 
+  // Manda el texto (dictado o escrito) a nuestra función de IA, y con la
+  // respuesta llena el formulario para que el usuario revise y confirme.
+  async function interpretarConIA() {
+    if (!textoLibre.trim()) {
+      setMensajeIA('Escribe o dicta algo primero.');
+      return;
+    }
+    setInterpretando(true);
+    setMensajeIA('Interpretando...');
+
+    try {
+      const respuesta = await fetch('/api/interpretar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: textoLibre }),
+      });
+
+      if (!respuesta.ok) {
+        setMensajeIA('No se pudo interpretar. Intenta de nuevo.');
+        setInterpretando(false);
+        return;
+      }
+
+      const datos = await respuesta.json();
+
+      // Llenar el formulario con lo que la IA entendió (el usuario revisa y confirma)
+      if (datos.titulo) setTarea(datos.titulo);
+      if (datos.tipo) setTipo(datos.tipo);
+      if (datos.importancia) setImportancia(datos.importancia);
+
+      if (datos.fecha) {
+        setFecha(datos.fecha);
+        if (datos.tipo === 'Tarea') setTieneFechaHora(true);
+      }
+      if (datos.hora12) setHora12(String(datos.hora12));
+      if (datos.minutos !== null && datos.minutos !== undefined) {
+        setMinutos(String(datos.minutos).padStart(2, '0'));
+      }
+      if (datos.ampm) setAmpm(datos.ampm);
+
+      setMensajeIA('Listo — revisa los campos antes de crear.');
+      setTextoLibre('');
+    } catch (error) {
+      setMensajeIA('Error al conectar con la IA. Intenta de nuevo.');
+    }
+    setInterpretando(false);
+  }
+
   async function crearTarea() {
     if (!tarea.trim()) {
       setMensaje('Escribe un título primero');
@@ -407,8 +458,7 @@ export default function App() {
           ...listaFinal,
           {
             titulo: nuevaSubtareaTempTitulo.trim(),
-            tiempo:
-              !isNaN(tiempoSuelto) && tiempoSuelto > 0 ? tiempoSuelto : 30,
+            tiempo: !isNaN(tiempoSuelto) && tiempoSuelto > 0 ? tiempoSuelto : 30,
           },
         ];
       }
@@ -418,19 +468,13 @@ export default function App() {
           .map((l) => l.trim())
           .filter((l) => l.length > 0);
         const tiempoLista = parseInt(tiempoListaTemp, 10);
-        const tFinal =
-          !isNaN(tiempoLista) && tiempoLista > 0 ? tiempoLista : 30;
-        listaFinal = [
-          ...listaFinal,
-          ...lineas.map((l) => ({ titulo: l, tiempo: tFinal })),
-        ];
+        const tFinal = !isNaN(tiempoLista) && tiempoLista > 0 ? tiempoLista : 30;
+        listaFinal = [...listaFinal, ...lineas.map((l) => ({ titulo: l, tiempo: tFinal }))];
       }
     }
 
     if (esContenedorDeSubtareas && listaFinal.length === 0) {
-      setMensaje(
-        'Agrega al menos una subtarea, o desmarca la casilla de dividir.'
-      );
+      setMensaje('Agrega al menos una subtarea, o desmarca la casilla de dividir.');
       return;
     }
 
@@ -565,8 +609,7 @@ export default function App() {
       .from('tasks')
       .update({
         state: nuevoEstado,
-        date_completed:
-          nuevoEstado === 'Hecho' ? new Date().toISOString() : null,
+        date_completed: nuevoEstado === 'Hecho' ? new Date().toISOString() : null,
       })
       .eq('id', t.id);
     if (!error) cargarTareas();
@@ -741,6 +784,62 @@ export default function App() {
       </div>
       <p style={{ color: '#666', fontSize: '13px' }}>{sesion.user.email}</p>
 
+      {/* Captura con IA: dicta (micrófono del teclado) o escribe libremente */}
+      <div
+        style={{
+          padding: '14px',
+          backgroundColor: '#f0edff',
+          borderRadius: '8px',
+          marginBottom: '16px',
+        }}
+      >
+        <label
+          style={{
+            fontSize: '13px',
+            color: '#555',
+            display: 'block',
+            marginBottom: '6px',
+          }}
+        >
+          ✨ Dicta o escribe libremente (ej. "reunión con Juan el viernes a
+          las 3pm"):
+        </label>
+        <textarea
+          value={textoLibre}
+          onChange={(e) => setTextoLibre(e.target.value)}
+          placeholder="Toca el micrófono del teclado para dictar..."
+          style={{
+            width: '100%',
+            padding: '10px',
+            fontSize: '16px',
+            minHeight: '50px',
+            fontFamily: 'Arial',
+            boxSizing: 'border-box',
+            marginBottom: '8px',
+          }}
+        />
+        <button
+          onClick={interpretarConIA}
+          disabled={interpretando}
+          style={{
+            padding: '10px 20px',
+            fontSize: '15px',
+            backgroundColor: interpretando ? '#bbb' : '#6c4fd6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: interpretando ? 'default' : 'pointer',
+          }}
+        >
+          {interpretando ? 'Interpretando...' : '✨ Interpretar con IA'}
+        </button>
+        {mensajeIA && (
+          <div style={{ fontSize: '13px', color: '#555', marginTop: '6px' }}>
+            {mensajeIA}
+          </div>
+        )}
+      </div>
+
       {/* Tipo, categoría, importancia */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
         <select
@@ -781,111 +880,99 @@ export default function App() {
 
       {/* Fecha y hora: obligatoria para Reunión/Recordatorio; opcional (con casilla) para Tarea */}
       {tipo !== 'Tarea' && !(tipo === 'Tarea' && tendraSubtareas) && (
-        <>
-          <div
-            style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}
+      <>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
+        <input
+          type="date"
+          value={fecha}
+          onChange={(e) => setFecha(e.target.value)}
+          style={estiloCampo}
+        />
+        <select
+          value={hora12}
+          onChange={(e) => setHora12(e.target.value)}
+          style={estiloHora}
+        >
+          {opcionesHora.map((h) => (
+            <option key={h} value={h}>
+              {h}
+            </option>
+          ))}
+        </select>
+        <span style={{ marginRight: '6px', fontSize: '18px' }}>:</span>
+        <select
+          value={minutos}
+          onChange={(e) => setMinutos(e.target.value)}
+          style={estiloHora}
+        >
+          {opcionesMinutos.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+        <select
+          value={ampm}
+          onChange={(e) => setAmpm(e.target.value)}
+          style={estiloHora}
+        >
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+
+      {/* Repetición + fin opcional */}
+      <div style={{ marginBottom: '10px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
+          <label style={{ fontSize: '14px', marginRight: '8px' }}>
+            Repetir:
+          </label>
+          <select
+            value={repeticion}
+            onChange={(e) => {
+              setRepeticion(e.target.value);
+              if (e.target.value === 'Ninguna') {
+                setRepeticionTieneFin(false);
+                setRepeticionFin('');
+              }
+            }}
+            style={estiloCampo}
           >
-            <input
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              style={estiloCampo}
-            />
-            <select
-              value={hora12}
-              onChange={(e) => setHora12(e.target.value)}
-              style={estiloHora}
-            >
-              {opcionesHora.map((h) => (
-                <option key={h} value={h}>
-                  {h}
-                </option>
-              ))}
-            </select>
-            <span style={{ marginRight: '6px', fontSize: '18px' }}>:</span>
-            <select
-              value={minutos}
-              onChange={(e) => setMinutos(e.target.value)}
-              style={estiloHora}
-            >
-              {opcionesMinutos.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-            <select
-              value={ampm}
-              onChange={(e) => setAmpm(e.target.value)}
-              style={estiloHora}
-            >
-              <option value="AM">AM</option>
-              <option value="PM">PM</option>
-            </select>
-          </div>
+            <option value="Ninguna">Ninguna</option>
+            <option value="Diaria">Diaria</option>
+            <option value="Semanal">Semanal</option>
+            <option value="Mensual">Mensual</option>
+          </select>
+        </div>
 
-          {/* Repetición + fin opcional */}
-          <div style={{ marginBottom: '10px' }}>
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-              }}
+        {repeticion !== 'Ninguna' && (
+          <div style={{ marginLeft: '4px' }}>
+            <label
+              style={{ fontSize: '14px', display: 'block', marginBottom: '6px' }}
             >
-              <label style={{ fontSize: '14px', marginRight: '8px' }}>
-                Repetir:
+              <input
+                type="checkbox"
+                checked={repeticionTieneFin}
+                onChange={(e) => setRepeticionTieneFin(e.target.checked)}
+                style={{ marginRight: '8px' }}
+              />
+              ¿Termina en una fecha?
+            </label>
+            {repeticionTieneFin && (
+              <label style={{ fontSize: '14px', display: 'block' }}>
+                Repetir hasta:
+                <input
+                  type="date"
+                  value={repeticionFin}
+                  onChange={(e) => setRepeticionFin(e.target.value)}
+                  style={{ ...estiloHora, marginLeft: '8px' }}
+                />
               </label>
-              <select
-                value={repeticion}
-                onChange={(e) => {
-                  setRepeticion(e.target.value);
-                  if (e.target.value === 'Ninguna') {
-                    setRepeticionTieneFin(false);
-                    setRepeticionFin('');
-                  }
-                }}
-                style={estiloCampo}
-              >
-                <option value="Ninguna">Ninguna</option>
-                <option value="Diaria">Diaria</option>
-                <option value="Semanal">Semanal</option>
-                <option value="Mensual">Mensual</option>
-              </select>
-            </div>
-
-            {repeticion !== 'Ninguna' && (
-              <div style={{ marginLeft: '4px' }}>
-                <label
-                  style={{
-                    fontSize: '14px',
-                    display: 'block',
-                    marginBottom: '6px',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={repeticionTieneFin}
-                    onChange={(e) => setRepeticionTieneFin(e.target.checked)}
-                    style={{ marginRight: '8px' }}
-                  />
-                  ¿Termina en una fecha?
-                </label>
-                {repeticionTieneFin && (
-                  <label style={{ fontSize: '14px', display: 'block' }}>
-                    Repetir hasta:
-                    <input
-                      type="date"
-                      value={repeticionFin}
-                      onChange={(e) => setRepeticionFin(e.target.value)}
-                      style={{ ...estiloHora, marginLeft: '8px' }}
-                    />
-                  </label>
-                )}
-              </div>
             )}
           </div>
-        </>
+        )}
+      </div>
+      </>
       )}
 
       {/* Tarea: fecha/hora OPCIONAL con casilla (lo que importa es la fecha límite) */}
@@ -1052,14 +1139,7 @@ export default function App() {
               onChange={(e) => setMinutosAntes(e.target.value)}
               style={{ ...estiloHora, width: '70px' }}
             />
-            <div
-              style={{
-                fontSize: '12px',
-                color: '#888',
-                width: '100%',
-                marginTop: '4px',
-              }}
-            >
+            <div style={{ fontSize: '12px', color: '#888', width: '100%', marginTop: '4px' }}>
               Por ahora solo se guarda tu preferencia — el envío real llegará
               más adelante.
             </div>
@@ -1117,11 +1197,7 @@ export default function App() {
           </label>
           {tieneFechaLimite && (
             <label
-              style={{
-                fontSize: '14px',
-                display: 'block',
-                marginBottom: '6px',
-              }}
+              style={{ fontSize: '14px', display: 'block', marginBottom: '6px' }}
             >
               Fecha límite (deadline):
               <input
@@ -1132,9 +1208,7 @@ export default function App() {
               />
             </label>
           )}
-          <label
-            style={{ fontSize: '14px', display: 'block', marginBottom: '10px' }}
-          >
+          <label style={{ fontSize: '14px', display: 'block', marginBottom: '10px' }}>
             <input
               type="checkbox"
               checked={requiereConfirmacion}
@@ -1152,18 +1226,14 @@ export default function App() {
                 onChange={(e) => setTiempoEstimado(e.target.value)}
                 style={{ ...estiloHora, marginLeft: '8px', width: '80px' }}
               />
-              <span
-                style={{ fontSize: '12px', color: '#888', marginLeft: '6px' }}
-              >
-                (30 min por defecto — el auto-llenado lo necesita para ubicarla
-                en la agenda)
+              <span style={{ fontSize: '12px', color: '#888', marginLeft: '6px' }}>
+                (30 min por defecto — el auto-llenado lo necesita para ubicarla en la agenda)
               </span>
             </label>
           )}
           {tendraSubtareas && (
             <div style={{ fontSize: '12px', color: '#888' }}>
-              El tiempo se calculará automáticamente sumando las subtareas de
-              arriba.
+              El tiempo se calculará automáticamente sumando las subtareas de arriba.
             </div>
           )}
         </div>
@@ -1179,14 +1249,7 @@ export default function App() {
       />
 
       {/* Notas (etiqueta contextual según el tipo) */}
-      <label
-        style={{
-          fontSize: '13px',
-          color: '#555',
-          display: 'block',
-          marginBottom: '4px',
-        }}
-      >
+      <label style={{ fontSize: '13px', color: '#555', display: 'block', marginBottom: '4px' }}>
         {tipo === 'Reunión'
           ? 'Comentarios / lo que se trató (opcional):'
           : 'Notas (opcional):'}
@@ -1228,9 +1291,7 @@ export default function App() {
                 marginTop: '8px',
               }}
             >
-              <div
-                style={{ fontSize: '12px', color: '#777', marginBottom: '8px' }}
-              >
+              <div style={{ fontSize: '12px', color: '#777', marginBottom: '8px' }}>
                 Como cada subtarea se agenda por separado, esta tarea no
                 necesita fecha/hora/repetición propias.
               </div>
@@ -1246,13 +1307,7 @@ export default function App() {
                         padding: '4px 0',
                       }}
                     >
-                      <span
-                        style={{
-                          color: '#007bff',
-                          marginRight: '6px',
-                          fontSize: '13px',
-                        }}
-                      >
+                      <span style={{ color: '#007bff', marginRight: '6px', fontSize: '13px' }}>
                         {i + 1}.
                       </span>
                       <span style={{ flex: 1, fontSize: '14px' }}>
@@ -1273,25 +1328,13 @@ export default function App() {
                       </button>
                     </div>
                   ))}
-                  <div
-                    style={{
-                      fontSize: '12px',
-                      color: '#555',
-                      marginTop: '4px',
-                    }}
-                  >
+                  <div style={{ fontSize: '12px', color: '#555', marginTop: '4px' }}>
                     Total: {subtareasTemp.reduce((s, x) => s + x.tiempo, 0)} min
                   </div>
                 </div>
               )}
 
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                }}
-              >
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
                 <input
                   type="text"
                   value={nuevaSubtareaTempTitulo}
@@ -1367,9 +1410,7 @@ export default function App() {
                   <textarea
                     value={textoListaTemp}
                     onChange={(e) => setTextoListaTemp(e.target.value)}
-                    placeholder={
-                      'Investigar proveedores\nComparar precios\nHacer pedido'
-                    }
+                    placeholder={'Investigar proveedores\nComparar precios\nHacer pedido'}
                     style={{
                       width: '100%',
                       padding: '8px',
@@ -1424,6 +1465,7 @@ export default function App() {
         </div>
       )}
 
+
       <button
         onClick={crearTarea}
         style={{
@@ -1452,20 +1494,13 @@ export default function App() {
       >
         <h3 style={{ marginTop: 0 }}>Mis categorías (orden de prioridad)</h3>
 
-        <div
-          style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}
-        >
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
           <input
             type="text"
             value={nuevaCategoria}
             onChange={(e) => setNuevaCategoria(e.target.value)}
             placeholder="Nueva categoría..."
-            style={{
-              padding: '8px',
-              fontSize: '15px',
-              marginRight: '10px',
-              marginBottom: '8px',
-            }}
+            style={{ padding: '8px', fontSize: '15px', marginRight: '10px', marginBottom: '8px' }}
           />
           <label style={{ fontSize: '14px', marginRight: '6px' }}>
             Posición:
@@ -1473,12 +1508,7 @@ export default function App() {
           <select
             value={nuevaPosicion}
             onChange={(e) => setNuevaPosicion(e.target.value)}
-            style={{
-              padding: '8px',
-              fontSize: '15px',
-              marginRight: '10px',
-              marginBottom: '8px',
-            }}
+            style={{ padding: '8px', fontSize: '15px', marginRight: '10px', marginBottom: '8px' }}
           >
             {opcionesPosicion.map((p) => (
               <option key={p} value={p}>
@@ -1488,11 +1518,7 @@ export default function App() {
           </select>
           <button
             onClick={agregarCategoria}
-            style={{
-              padding: '8px 16px',
-              fontSize: '15px',
-              marginBottom: '8px',
-            }}
+            style={{ padding: '8px 16px', fontSize: '15px', marginBottom: '8px' }}
           >
             Agregar
           </button>
@@ -1518,13 +1544,7 @@ export default function App() {
                 }}
               >
                 <span style={{ display: 'flex', alignItems: 'center' }}>
-                  <span
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      marginRight: '8px',
-                    }}
-                  >
+                  <span style={{ display: 'flex', flexDirection: 'column', marginRight: '8px' }}>
                     <button
                       onClick={() => moverCategoria(c, 'subir')}
                       disabled={indice === 0}
@@ -1552,15 +1572,10 @@ export default function App() {
                         border: 'none',
                         borderRadius: '3px',
                         cursor:
-                          indice === categorias.length - 1
-                            ? 'default'
-                            : 'pointer',
+                          indice === categorias.length - 1 ? 'default' : 'pointer',
                         backgroundColor:
-                          indice === categorias.length - 1
-                            ? '#f0f0f0'
-                            : '#dde7f5',
-                        color:
-                          indice === categorias.length - 1 ? '#bbb' : '#333',
+                          indice === categorias.length - 1 ? '#f0f0f0' : '#dde7f5',
+                        color: indice === categorias.length - 1 ? '#bbb' : '#333',
                       }}
                     >
                       ▼
@@ -1587,9 +1602,7 @@ export default function App() {
                     {editandoId === c.id ? 'Cerrar' : 'Editar'}
                   </button>
                   <button
-                    onClick={() =>
-                      borrarCategoria(c.id, c.name, c.priority_order)
-                    }
+                    onClick={() => borrarCategoria(c.id, c.name, c.priority_order)}
                     style={{
                       padding: '4px 10px',
                       fontSize: '13px',
@@ -1677,26 +1690,14 @@ export default function App() {
               overflow: 'hidden',
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                padding: '15px',
-              }}
-            >
+            <div style={{ display: 'flex', alignItems: 'flex-start', padding: '15px' }}>
               {/* Casilla concluir (solo Tareas) */}
               {t.type === 'Tarea' && (
                 <input
                   type="checkbox"
                   checked={concluida}
                   onChange={() => alternarConcluida(t)}
-                  style={{
-                    marginRight: '12px',
-                    marginTop: '3px',
-                    width: '18px',
-                    height: '18px',
-                    flexShrink: 0,
-                  }}
+                  style={{ marginRight: '12px', marginTop: '3px', width: '18px', height: '18px', flexShrink: 0 }}
                 />
               )}
               {/* Contenido: click para expandir */}
@@ -1724,59 +1725,22 @@ export default function App() {
                 </small>
                 {subs.length > 0 && (
                   <div style={{ marginTop: '6px' }}>
-                    <div
-                      style={{
-                        fontSize: '12px',
-                        color: '#555',
-                        marginBottom: '3px',
-                      }}
-                    >
-                      Avance: {avance}% (
-                      {subs.filter((s) => s.state === 'Hecho').length}/
-                      {subs.length} subtareas)
-                      {tiempoTotal > 0
-                        ? ' · ' + tiempoTotal + ' min estimados'
-                        : ''}
+                    <div style={{ fontSize: '12px', color: '#555', marginBottom: '3px' }}>
+                      Avance: {avance}% ({subs.filter((s) => s.state === 'Hecho').length}/{subs.length} subtareas)
+                      {tiempoTotal > 0 ? ' · ' + tiempoTotal + ' min estimados' : ''}
                     </div>
-                    <div
-                      style={{
-                        height: '6px',
-                        backgroundColor: '#e0e0e0',
-                        borderRadius: '3px',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: avance + '%',
-                          height: '100%',
-                          backgroundColor: '#4caf50',
-                        }}
-                      />
+                    <div style={{ height: '6px', backgroundColor: '#e0e0e0', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ width: avance + '%', height: '100%', backgroundColor: '#4caf50' }} />
                     </div>
                   </div>
                 )}
-                {t.type === 'Tarea' &&
-                  subs.length === 0 &&
-                  t.time_estimated && (
-                    <div
-                      style={{
-                        fontSize: '12px',
-                        color: '#555',
-                        marginTop: '4px',
-                      }}
-                    >
-                      ⏱ {t.time_estimated} min estimados
-                    </div>
-                  )}
+                {t.type === 'Tarea' && subs.length === 0 && t.time_estimated && (
+                  <div style={{ fontSize: '12px', color: '#555', marginTop: '4px' }}>
+                    ⏱ {t.time_estimated} min estimados
+                  </div>
+                )}
                 {t.repetition && t.repetition !== 'Ninguna' && (
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#555',
-                      marginTop: '4px',
-                    }}
-                  >
+                  <div style={{ fontSize: '13px', color: '#555', marginTop: '4px' }}>
                     🔁 Se repite: {t.repetition}
                     {t.repetition_end
                       ? ' (hasta ' +
@@ -1786,52 +1750,26 @@ export default function App() {
                   </div>
                 )}
                 {t.type === 'Tarea' && t.deadline && (
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#c55',
-                      marginTop: '4px',
-                    }}
-                  >
+                  <div style={{ fontSize: '13px', color: '#c55', marginTop: '4px' }}>
                     ⏰ Fecha límite:{' '}
                     {new Date(t.deadline).toLocaleDateString('es-MX')}
                   </div>
                 )}
                 {t.type === 'Reunión' && t.location && (
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#555',
-                      marginTop: '4px',
-                    }}
-                  >
+                  <div style={{ fontSize: '13px', color: '#555', marginTop: '4px' }}>
                     📍 {t.location}
                   </div>
                 )}
                 {t.notes && (
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#555',
-                      marginTop: '4px',
-                    }}
-                  >
+                  <div style={{ fontSize: '13px', color: '#555', marginTop: '4px' }}>
                     {t.type === 'Reunión' ? '💬' : '📝'} {t.notes}
                   </div>
                 )}
-                {t.notification_channels &&
-                  t.notification_channels.length > 0 && (
-                    <div
-                      style={{
-                        fontSize: '12px',
-                        color: '#888',
-                        marginTop: '4px',
-                      }}
-                    >
-                      🔔 {t.notification_channels[0]} ·{' '}
-                      {t.reminder_minutes_before || 15} min antes
-                    </div>
-                  )}
+                {t.notification_channels && t.notification_channels.length > 0 && (
+                  <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                    🔔 {t.notification_channels[0]} · {t.reminder_minutes_before || 15} min antes
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1844,36 +1782,17 @@ export default function App() {
                   borderTop: '1px solid #e5e5e5',
                 }}
               >
-                <label
-                  style={{
-                    fontSize: '13px',
-                    color: '#555',
-                    display: 'block',
-                    marginBottom: '4px',
-                  }}
-                >
+                <label style={{ fontSize: '13px', color: '#555', display: 'block', marginBottom: '4px' }}>
                   Título:
                 </label>
                 <input
                   type="text"
                   value={etTitulo}
                   onChange={(e) => setEtTitulo(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    fontSize: '15px',
-                    boxSizing: 'border-box',
-                    marginBottom: '10px',
-                  }}
+                  style={{ width: '100%', padding: '8px', fontSize: '15px', boxSizing: 'border-box', marginBottom: '10px' }}
                 />
 
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                  }}
-                >
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
                   <select
                     value={etCategoria}
                     onChange={(e) => setEtCategoria(e.target.value)}
@@ -1899,13 +1818,7 @@ export default function App() {
                   </select>
                 </div>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                  }}
-                >
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
                   <input
                     type="date"
                     value={etFecha}
@@ -1923,9 +1836,7 @@ export default function App() {
                       </option>
                     ))}
                   </select>
-                  <span style={{ marginRight: '6px', fontSize: '18px' }}>
-                    :
-                  </span>
+                  <span style={{ marginRight: '6px', fontSize: '18px' }}>:</span>
                   <select
                     value={etMinutos}
                     onChange={(e) => setEtMinutos(e.target.value)}
@@ -1947,14 +1858,7 @@ export default function App() {
                   </select>
                 </div>
 
-                <label
-                  style={{
-                    fontSize: '13px',
-                    color: '#555',
-                    display: 'block',
-                    marginBottom: '4px',
-                  }}
-                >
+                <label style={{ fontSize: '13px', color: '#555', display: 'block', marginBottom: '4px' }}>
                   {t.type === 'Reunión'
                     ? 'Comentarios / lo que se trató:'
                     : 'Notas:'}
@@ -1967,48 +1871,23 @@ export default function App() {
                       ? 'Qué se acordó, pendientes, siguientes pasos...'
                       : 'Notas...'
                   }
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    fontSize: '14px',
-                    minHeight: '50px',
-                    fontFamily: 'Arial',
-                    boxSizing: 'border-box',
-                    marginBottom: '10px',
-                  }}
+                  style={{ width: '100%', padding: '8px', fontSize: '14px', minHeight: '50px', fontFamily: 'Arial', boxSizing: 'border-box', marginBottom: '10px' }}
                 />
 
                 {t.type === 'Tarea' && subs.length === 0 && (
-                  <label
-                    style={{
-                      fontSize: '14px',
-                      display: 'block',
-                      marginBottom: '10px',
-                    }}
-                  >
+                  <label style={{ fontSize: '14px', display: 'block', marginBottom: '10px' }}>
                     Tiempo estimado (minutos):
                     <input
                       type="number"
                       value={etTiempoEstimado}
                       onChange={(e) => setEtTiempoEstimado(e.target.value)}
-                      style={{
-                        ...estiloHora,
-                        marginLeft: '8px',
-                        width: '80px',
-                      }}
+                      style={{ ...estiloHora, marginLeft: '8px', width: '80px' }}
                     />
                   </label>
                 )}
                 {t.type === 'Tarea' && subs.length > 0 && (
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      color: '#888',
-                      marginBottom: '10px',
-                    }}
-                  >
-                    Tiempo tomado de la suma de sus {subs.length} subtarea(s):{' '}
-                    {tiempoTotal} min
+                  <div style={{ fontSize: '13px', color: '#888', marginBottom: '10px' }}>
+                    Tiempo tomado de la suma de sus {subs.length} subtarea(s): {tiempoTotal} min
                   </div>
                 )}
 
@@ -2043,270 +1922,252 @@ export default function App() {
 
                 {/* Subtareas (incisos) — SOLO para Tareas */}
                 {t.type === 'Tarea' && (
-                  <div
-                    style={{
-                      marginTop: '15px',
-                      paddingTop: '12px',
-                      borderTop: '1px solid #e5e5e5',
-                    }}
-                  >
-                    <strong style={{ fontSize: '14px', color: '#333' }}>
-                      Subtareas
-                    </strong>
+                <div
+                  style={{
+                    marginTop: '15px',
+                    paddingTop: '12px',
+                    borderTop: '1px solid #e5e5e5',
+                  }}
+                >
+                  <strong style={{ fontSize: '14px', color: '#333' }}>
+                    Subtareas
+                  </strong>
 
-                    {subs.map((s, i) => (
-                      <div
-                        key={s.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '6px 0',
-                        }}
-                      >
-                        <span
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            marginRight: '6px',
-                          }}
-                        >
-                          <button
-                            onClick={() => moverSubtarea(s, t.id, 'subir')}
-                            disabled={i === 0}
-                            style={{
-                              fontSize: '10px',
-                              lineHeight: '1',
-                              padding: '1px 4px',
-                              border: 'none',
-                              borderRadius: '3px',
-                              cursor: i === 0 ? 'default' : 'pointer',
-                              backgroundColor: i === 0 ? '#f0f0f0' : '#dde7f5',
-                              color: i === 0 ? '#bbb' : '#333',
-                              marginBottom: '1px',
-                            }}
-                          >
-                            ▲
-                          </button>
-                          <button
-                            onClick={() => moverSubtarea(s, t.id, 'bajar')}
-                            disabled={i === subs.length - 1}
-                            style={{
-                              fontSize: '10px',
-                              lineHeight: '1',
-                              padding: '1px 4px',
-                              border: 'none',
-                              borderRadius: '3px',
-                              cursor:
-                                i === subs.length - 1 ? 'default' : 'pointer',
-                              backgroundColor:
-                                i === subs.length - 1 ? '#f0f0f0' : '#dde7f5',
-                              color: i === subs.length - 1 ? '#bbb' : '#333',
-                            }}
-                          >
-                            ▼
-                          </button>
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={s.state === 'Hecho'}
-                          onChange={() => alternarSubtarea(s)}
-                          style={{
-                            marginRight: '8px',
-                            width: '16px',
-                            height: '16px',
-                          }}
-                        />
-                        <span
-                          style={{
-                            color: '#007bff',
-                            marginRight: '6px',
-                            fontSize: '13px',
-                          }}
-                        >
-                          {numeroTarea}.{i + 1}
-                        </span>
-                        <span
-                          style={{
-                            flex: 1,
-                            fontSize: '14px',
-                            textDecoration:
-                              s.state === 'Hecho' ? 'line-through' : 'none',
-                            color: s.state === 'Hecho' ? '#999' : '#000',
-                          }}
-                        >
-                          {s.title}
-                          {s.time_estimated
-                            ? ' (' + s.time_estimated + ' min)'
-                            : ''}
-                        </span>
-                        <button
-                          onClick={() => borrarSubtarea(s, t.id)}
-                          style={{
-                            fontSize: '12px',
-                            padding: '2px 8px',
-                            backgroundColor: '#fdd',
-                            border: 'none',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-
+                  {subs.map((s, i) => (
                     <div
+                      key={s.id}
                       style={{
                         display: 'flex',
-                        flexWrap: 'wrap',
                         alignItems: 'center',
-                        marginTop: '8px',
+                        padding: '6px 0',
                       }}
                     >
+                      <span style={{ display: 'flex', flexDirection: 'column', marginRight: '6px' }}>
+                        <button
+                          onClick={() => moverSubtarea(s, t.id, 'subir')}
+                          disabled={i === 0}
+                          style={{
+                            fontSize: '10px',
+                            lineHeight: '1',
+                            padding: '1px 4px',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: i === 0 ? 'default' : 'pointer',
+                            backgroundColor: i === 0 ? '#f0f0f0' : '#dde7f5',
+                            color: i === 0 ? '#bbb' : '#333',
+                            marginBottom: '1px',
+                          }}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          onClick={() => moverSubtarea(s, t.id, 'bajar')}
+                          disabled={i === subs.length - 1}
+                          style={{
+                            fontSize: '10px',
+                            lineHeight: '1',
+                            padding: '1px 4px',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: i === subs.length - 1 ? 'default' : 'pointer',
+                            backgroundColor: i === subs.length - 1 ? '#f0f0f0' : '#dde7f5',
+                            color: i === subs.length - 1 ? '#bbb' : '#333',
+                          }}
+                        >
+                          ▼
+                        </button>
+                      </span>
                       <input
-                        type="text"
-                        value={nuevaSubtarea}
-                        onChange={(e) => setNuevaSubtarea(e.target.value)}
-                        placeholder="Nueva subtarea..."
+                        type="checkbox"
+                        checked={s.state === 'Hecho'}
+                        onChange={() => alternarSubtarea(s)}
+                        style={{ marginRight: '8px', width: '16px', height: '16px' }}
+                      />
+                      <span style={{ color: '#007bff', marginRight: '6px', fontSize: '13px' }}>
+                        {numeroTarea}.{i + 1}
+                      </span>
+                      <span
                         style={{
                           flex: 1,
-                          minWidth: '140px',
-                          padding: '6px',
                           fontSize: '14px',
-                          marginRight: '6px',
-                          marginBottom: '6px',
+                          textDecoration:
+                            s.state === 'Hecho' ? 'line-through' : 'none',
+                          color: s.state === 'Hecho' ? '#999' : '#000',
+                        }}
+                      >
+                        {s.title}
+                        {s.time_estimated
+                          ? ' (' + s.time_estimated + ' min)'
+                          : ''}
+                      </span>
+                      <button
+                        onClick={() => borrarSubtarea(s, t.id)}
+                        style={{
+                          fontSize: '12px',
+                          padding: '2px 8px',
+                          backgroundColor: '#fdd',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      marginTop: '8px',
+                    }}
+                  >
+                    <input
+                      type="text"
+                      value={nuevaSubtarea}
+                      onChange={(e) => setNuevaSubtarea(e.target.value)}
+                      placeholder="Nueva subtarea..."
+                      style={{
+                        flex: 1,
+                        minWidth: '140px',
+                        padding: '6px',
+                        fontSize: '14px',
+                        marginRight: '6px',
+                        marginBottom: '6px',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <input
+                      type="number"
+                      value={nuevaSubtareaTiempo}
+                      onChange={(e) => setNuevaSubtareaTiempo(e.target.value)}
+                      placeholder="min"
+                      style={{
+                        width: '70px',
+                        padding: '6px',
+                        fontSize: '14px',
+                        marginRight: '6px',
+                        marginBottom: '6px',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <button
+                      onClick={() => agregarSubtarea(t.id)}
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '14px',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      + Agregar
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      setMostrarPegarLista(
+                        mostrarPegarLista === t.id ? null : t.id
+                      )
+                    }
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '13px',
+                      backgroundColor: '#f0f0f0',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      marginTop: '4px',
+                    }}
+                  >
+                    {mostrarPegarLista === t.id
+                      ? 'Cerrar'
+                      : '📋 Pegar lista de tareas'}
+                  </button>
+
+                  {mostrarPegarLista === t.id && (
+                    <div
+                      style={{
+                        marginTop: '10px',
+                        padding: '10px',
+                        backgroundColor: '#f7faff',
+                        borderRadius: '6px',
+                      }}
+                    >
+                      <label
+                        style={{
+                          fontSize: '13px',
+                          color: '#555',
+                          display: 'block',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        Pega tu lista (una subtarea por renglón):
+                      </label>
+                      <textarea
+                        value={textoListaPegada}
+                        onChange={(e) => setTextoListaPegada(e.target.value)}
+                        placeholder={
+                          'Calentamiento\nRutina de fuerza\nEnfriamiento'
+                        }
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          fontSize: '14px',
+                          minHeight: '90px',
+                          fontFamily: 'Arial',
                           boxSizing: 'border-box',
+                          marginBottom: '8px',
                         }}
                       />
+                      <label
+                        style={{
+                          fontSize: '13px',
+                          color: '#555',
+                          display: 'block',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        Minutos para CADA UNA (obligatorio — el auto-llenado
+                        lo necesita):
+                      </label>
                       <input
                         type="number"
-                        value={nuevaSubtareaTiempo}
-                        onChange={(e) => setNuevaSubtareaTiempo(e.target.value)}
-                        placeholder="min"
+                        value={tiempoListaPegada}
+                        onChange={(e) => setTiempoListaPegada(e.target.value)}
+                        placeholder="ej. 30"
                         style={{
-                          width: '70px',
+                          width: '100px',
                           padding: '6px',
                           fontSize: '14px',
-                          marginRight: '6px',
-                          marginBottom: '6px',
+                          marginBottom: '8px',
                           boxSizing: 'border-box',
                         }}
                       />
+                      <br />
                       <button
-                        onClick={() => agregarSubtarea(t.id)}
+                        onClick={() => procesarListaPegada(t.id)}
                         style={{
-                          padding: '6px 14px',
+                          padding: '8px 16px',
                           fontSize: '14px',
                           backgroundColor: '#007bff',
                           color: 'white',
                           border: 'none',
                           borderRadius: '4px',
                           cursor: 'pointer',
-                          marginBottom: '6px',
                         }}
                       >
-                        + Agregar
+                        Crear subtareas de la lista
                       </button>
                     </div>
-
-                    <button
-                      onClick={() =>
-                        setMostrarPegarLista(
-                          mostrarPegarLista === t.id ? null : t.id
-                        )
-                      }
-                      style={{
-                        padding: '4px 10px',
-                        fontSize: '13px',
-                        backgroundColor: '#f0f0f0',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        marginTop: '4px',
-                      }}
-                    >
-                      {mostrarPegarLista === t.id
-                        ? 'Cerrar'
-                        : '📋 Pegar lista de tareas'}
-                    </button>
-
-                    {mostrarPegarLista === t.id && (
-                      <div
-                        style={{
-                          marginTop: '10px',
-                          padding: '10px',
-                          backgroundColor: '#f7faff',
-                          borderRadius: '6px',
-                        }}
-                      >
-                        <label
-                          style={{
-                            fontSize: '13px',
-                            color: '#555',
-                            display: 'block',
-                            marginBottom: '4px',
-                          }}
-                        >
-                          Pega tu lista (una subtarea por renglón):
-                        </label>
-                        <textarea
-                          value={textoListaPegada}
-                          onChange={(e) => setTextoListaPegada(e.target.value)}
-                          placeholder={
-                            'Calentamiento\nRutina de fuerza\nEnfriamiento'
-                          }
-                          style={{
-                            width: '100%',
-                            padding: '8px',
-                            fontSize: '14px',
-                            minHeight: '90px',
-                            fontFamily: 'Arial',
-                            boxSizing: 'border-box',
-                            marginBottom: '8px',
-                          }}
-                        />
-                        <label
-                          style={{
-                            fontSize: '13px',
-                            color: '#555',
-                            display: 'block',
-                            marginBottom: '4px',
-                          }}
-                        >
-                          Minutos para CADA UNA (obligatorio — el auto-llenado
-                          lo necesita):
-                        </label>
-                        <input
-                          type="number"
-                          value={tiempoListaPegada}
-                          onChange={(e) => setTiempoListaPegada(e.target.value)}
-                          placeholder="ej. 30"
-                          style={{
-                            width: '100px',
-                            padding: '6px',
-                            fontSize: '14px',
-                            marginBottom: '8px',
-                            boxSizing: 'border-box',
-                          }}
-                        />
-                        <br />
-                        <button
-                          onClick={() => procesarListaPegada(t.id)}
-                          style={{
-                            padding: '8px 16px',
-                            fontSize: '14px',
-                            backgroundColor: '#007bff',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Crear subtareas de la lista
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  )}
+                </div>
                 )}
               </div>
             )}
