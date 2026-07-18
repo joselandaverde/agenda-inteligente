@@ -32,7 +32,8 @@ Interpreta el texto y devuelve exactamente estos campos:
   "hora12": "número del 1 al 12, o null si no se menciona hora",
   "minutos": "00, 15, 30 o 45 (redondea al más cercano), o null si no se menciona hora",
   "ampm": "AM o PM, o null si no se menciona hora",
-  "importancia": "Muy alta" | "Alta" | "Media" | "Baja" | "Muy baja"
+  "importancia": "Muy alta" | "Alta" | "Media" | "Baja" | "Muy baja",
+  "duracionMinutos": "número de minutos si se menciona duración (ej. 'de una hora' = 60, 'de media hora' = 30), o null si no se menciona"
 }
 
 Reglas para decidir el tipo:
@@ -42,6 +43,7 @@ Reglas para decidir el tipo:
 
 Si no se menciona importancia, usa "Media" por defecto.
 Si no se menciona fecha/hora, deja esos campos en null (no inventes).
+Si no se menciona duración, deja "duracionMinutos" en null (la app usará un valor por defecto).
 
 Texto del usuario: "${texto}"`;
 
