@@ -1,90 +1,95 @@
 // api/interpretar.js
 // Recibe un texto (dictado o escrito) y le pide a Claude, vía Vercel AI Gateway,
 // que lo interprete y devuelva los campos del compromiso ya organizados.
-// La llave (AI_GATEWAY_API_KEY) vive protegida en Vercel, nunca en el navegador.
+//
+// Bloque 0-A (SEG-01): exige sesión válida de Supabase, limita frecuencia y
+// tamaño, resuelve fechas con la fecha local del teléfono y valida la respuesta
+// de la IA campo por campo. La lógica está en _lib/interpretar-core.mjs; aquí
+// solo se conectan las dependencias reales.
+//
+// Secretos: AI_GATEWAY_API_KEY vive en Vercel, nunca en el navegador. La URL y
+// la llave *publishable* de Supabase son públicas por diseño; se leen de
+// variables de entorno y, mientras no existan (bloque 0-B), se usan los valores
+// públicos actuales.
 
-export default async function handler(req, res) {
-  // Solo aceptamos peticiones POST
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido' });
-  }
+import { createClient } from '@supabase/supabase-js';
+import {
+  LIMITES,
+  crearHandler,
+  crearLimitadorMemoria,
+} from './_lib/interpretar-core.mjs';
 
-  const { texto } = req.body;
+// No se usan las variables REACT_APP_SUPABASE_* de Vercel: su valor no está
+// verificado y un valor distinto haría fallar la verificación de sesión.
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://uxpktmrurvxqigiiharn.supabase.co';
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY || 'sb_publishable_UWLfZ0xy0jqGlJ5gQZGsNA_uDLKp1Nu';
 
-  if (!texto || !texto.trim()) {
-    return res.status(400).json({ error: 'Falta el texto a interpretar' });
-  }
+const limites = {
+  ...LIMITES,
+  POR_HORA: Number(process.env.AI_LIMITE_POR_HORA) || LIMITES.POR_HORA,
+};
 
-  // Fecha de hoy, para que Claude sepa a qué se refieren cosas como "mañana" o "el viernes"
-  const hoy = new Date().toISOString().split('T')[0];
+const opcionesAuth = { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false };
 
-  const instrucciones = `Eres un asistente que interpreta texto en español dictado por un usuario
-y lo convierte en los campos de un compromiso de agenda. Responde SOLO con un
-objeto JSON válido, sin texto adicional, sin explicaciones, sin comillas de markdown.
-
-La fecha de hoy es: ${hoy}
-
-Interpreta el texto y devuelve exactamente estos campos:
-{
-  "titulo": "string corto y claro, sin la fecha/hora/tipo mencionados en el texto",
-  "tipo": "Reunión" | "Tarea" | "Recordatorio",
-  "fecha": "YYYY-MM-DD o null si no se menciona ninguna fecha",
-  "hora12": "número del 1 al 12, o null si no se menciona hora",
-  "minutos": "00, 15, 30 o 45 (redondea al más cercano), o null si no se menciona hora",
-  "ampm": "AM o PM, o null si no se menciona hora",
-  "importancia": "Muy alta" | "Alta" | "Media" | "Baja" | "Muy baja",
-  "duracionMinutos": "número de minutos si se menciona duración (ej. 'de una hora' = 60, 'de media hora' = 30), o null si no se menciona"
+async function verificarToken(token) {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: opcionesAuth });
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data || !data.user) return null;
+  return { id: data.user.id };
 }
 
-Reglas para decidir el tipo:
-- "Reunión": si menciona reunirse, ver, llamar, hablar CON alguien más.
-- "Recordatorio": si es solo un aviso puntual, sin acción a realizar (ej. "recuérdame llamar al banco").
-- "Tarea": cualquier otro pendiente por hacer.
+const limitadorMemoria = crearLimitadorMemoria(limites);
 
-Si no se menciona importancia, usa "Media" por defecto.
-Si no se menciona fecha/hora, deja esos campos en null (no inventes).
-Si no se menciona duración, deja "duracionMinutos" en null (la app usará un valor por defecto).
-
-Texto del usuario: "${texto}"`;
-
-  try {
-    const respuesta = await fetch('https://ai-gateway.vercel.sh/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'anthropic/claude-haiku-4-5',
-        max_tokens: 500,
-        messages: [{ role: 'user', content: instrucciones }],
-        stream: false,
-      }),
-    });
-
-    if (!respuesta.ok) {
-      const errorTexto = await respuesta.text();
-      console.error('Error del Gateway:', errorTexto);
-      return res.status(500).json({ error: 'Error al conectar con la IA' });
+async function registrarUso(token, userId) {
+  // Cliente que actúa como el usuario: la función de base de datos usa auth.uid().
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: opcionesAuth,
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const { data, error } = await supabase.rpc('ai_check_and_increment', {
+    p_limit: limites.POR_HORA,
+    p_window_seconds: limites.VENTANA_SEG,
+  });
+  if (error) {
+    // PGRST202: la función aún no existe (migración ai_usage sin aplicar).
+    // Se usa el limitador en memoria y se deja constancia; cualquier otro error se propaga.
+    if (error.code === 'PGRST202') {
+      console.warn(JSON.stringify({ evento: 'interpretar', aviso: 'rpc ai_check_and_increment no existe; limitador en memoria' }));
+      return limitadorMemoria(userId);
     }
-
-    const datos = await respuesta.json();
-    const textoRespuesta = datos.choices?.[0]?.message?.content || '';
-
-    // Limpiar por si la IA envuelve el JSON en ```json ... ```
-    const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
-
-    let interpretado;
-    try {
-      interpretado = JSON.parse(limpio);
-    } catch (e) {
-      console.error('No se pudo interpretar la respuesta:', textoRespuesta);
-      return res.status(500).json({ error: 'La IA no devolvió un formato válido' });
-    }
-
-    return res.status(200).json(interpretado);
-  } catch (error) {
-    console.error('Error general:', error);
-    return res.status(500).json({ error: 'Error al procesar la solicitud' });
+    throw new Error(error.code || 'rpc_error');
   }
+  const fila = Array.isArray(data) ? data[0] : data;
+  if (!fila) throw new Error('rpc_sin_resultado');
+  return { allowed: fila.allowed === true, remaining: fila.remaining, resetAt: fila.reset_at, modo: 'bd' };
 }
+
+async function llamarIA(prompt) {
+  const respuesta = await fetch('https://ai-gateway.vercel.sh/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'anthropic/claude-haiku-4-5',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: prompt }],
+      stream: false,
+    }),
+  });
+  if (!respuesta.ok) {
+    console.error(JSON.stringify({ evento: 'interpretar', error: 'gateway', status: respuesta.status }));
+    throw new Error('gateway_' + respuesta.status);
+  }
+  const datos = await respuesta.json();
+  return (datos.choices && datos.choices[0] && datos.choices[0].message && datos.choices[0].message.content) || '';
+}
+
+// Bitácora mínima: nunca incluye el texto del usuario ni el token.
+function registrar(evento) {
+  console.info(JSON.stringify({ ...evento, ts: new Date().toISOString() }));
+}
+
+export default crearHandler({ verificarToken, registrarUso, llamarIA, registrar, limites });

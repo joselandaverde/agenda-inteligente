@@ -402,14 +402,42 @@ export default function App() {
     setMensajeIA('Interpretando...');
 
     try {
+      // Bloque 0-A: el servidor exige la sesión del usuario (token de Supabase)
+      // y recibe la fecha local del teléfono para resolver "mañana", "el viernes", etc.
+      const { data: sesionActual } = await supabase.auth.getSession();
+      const token = sesionActual?.session?.access_token;
+      if (!token) {
+        setMensajeIA('Tu sesión expiró. Vuelve a entrar para usar la IA.');
+        setInterpretando(false);
+        return;
+      }
+      const ahora = new Date();
+      const fechaLocal = [
+        ahora.getFullYear(),
+        String(ahora.getMonth() + 1).padStart(2, '0'),
+        String(ahora.getDate()).padStart(2, '0'),
+      ].join('-');
+      const zonaHoraria = Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+
       const respuesta = await fetch('/api/interpretar', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texto: textoLibre }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ texto: textoLibre, fechaLocal, zonaHoraria }),
       });
 
       if (!respuesta.ok) {
-        setMensajeIA('No se pudo interpretar. Intenta de nuevo.');
+        if (respuesta.status === 401) {
+          setMensajeIA('Tu sesión expiró. Vuelve a entrar para usar la IA.');
+        } else if (respuesta.status === 413) {
+          setMensajeIA('El texto es demasiado largo (máximo 1,000 caracteres).');
+        } else if (respuesta.status === 429) {
+          setMensajeIA('Alcanzaste el límite de interpretaciones por hora. Intenta más tarde.');
+        } else {
+          setMensajeIA('No se pudo interpretar. Intenta de nuevo.');
+        }
         setInterpretando(false);
         return;
       }
@@ -432,7 +460,14 @@ export default function App() {
       if (datos.ampm) setAmpm(datos.ampm);
       if (datos.duracionMinutos) setTiempoEstimado(String(datos.duracionMinutos));
 
-      setMensajeIA('Listo — revisa los campos antes de crear.');
+      if (Array.isArray(datos.advertencias) && datos.advertencias.length > 0) {
+        setMensajeIA(
+          'Listo — revisa los campos antes de crear. No se pudo interpretar: ' +
+            datos.advertencias.join(', ') + '.'
+        );
+      } else {
+        setMensajeIA('Listo — revisa los campos antes de crear.');
+      }
       setTextoLibre('');
     } catch (error) {
       setMensajeIA('Error al conectar con la IA. Intenta de nuevo.');
