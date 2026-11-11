@@ -1,4 +1,8 @@
-// api/interpretar.js
+// api/interpretar.mjs
+// Extensión .mjs a propósito: Vercel ejecuta el archivo como módulo ES nativo.
+// Con .js (y sin "type": "module" en package.json) Vercel lo convierte a
+// CommonJS y el import del núcleo .mjs falla al arrancar con ERR_REQUIRE_ESM
+// (incidente del 2026-11-11 en la vista previa del PR #1).
 // Recibe un texto (dictado o escrito) y le pide a Claude, vía Vercel AI Gateway,
 // que lo interprete y devuelva los campos del compromiso ya organizados.
 //
