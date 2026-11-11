@@ -143,10 +143,11 @@ describe('endpoint /api/interpretar', () => {
     assert.equal(res.cuerpo.fecha, null);
     assert.equal(res.cuerpo.hora12, null);
     assert.equal(res.cuerpo.minutos, null);
-    assert.equal(res.cuerpo.ampm, 'AM'); // 'am' se normaliza, es válido
+    assert.equal(res.cuerpo.ampm, null); // sin número de hora, la hora queda vacía completa
     assert.equal(res.cuerpo.importancia, null);
     assert.equal(res.cuerpo.duracionMinutos, null);
-    assert.deepEqual(res.cuerpo.advertencias.sort(), ['duracionMinutos', 'fecha', 'hora12', 'importancia', 'minutos', 'tipo']);
+    // Avisos con nombres legibles, sin repetidos y en orden estable
+    assert.deepEqual(res.cuerpo.advertencias, ['tipo', 'fecha', 'hora', 'duración', 'importancia']);
   });
 
   test('9. la IA no devuelve JSON → 502', async () => {

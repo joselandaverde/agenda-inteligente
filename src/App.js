@@ -462,8 +462,9 @@ export default function App() {
 
       if (Array.isArray(datos.advertencias) && datos.advertencias.length > 0) {
         setMensajeIA(
-          'Listo — revisa los campos antes de crear. No se pudo interpretar: ' +
-            datos.advertencias.join(', ') + '.'
+          'Atención, no se pudo interpretar: ' +
+            datos.advertencias.join(', ') +
+            '. Ese dato NO se llenó: corrígelo a mano antes de crear.'
         );
       } else {
         setMensajeIA('Listo — revisa los campos antes de crear.');
