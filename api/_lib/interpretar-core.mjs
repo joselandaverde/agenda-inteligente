@@ -276,6 +276,31 @@ export function extraerJSON(textoRespuesta) {
   }
 }
 
+// ---------- Configuración del servidor ----------
+
+/**
+ * Lee la configuración del ambiente. Acepta los nombres propios del servidor
+ * (SUPABASE_URL, SUPABASE_ANON_KEY) o los mismos que usa la app
+ * (REACT_APP_SUPABASE_*), para no duplicar variables en Vercel.
+ * `faltantes` lleva solo nombres de variables, nunca valores.
+ */
+export function configuracionServidor(env = {}) {
+  const leer = (...nombres) => {
+    for (const n of nombres) {
+      if (typeof env[n] === 'string' && env[n].trim()) return env[n].trim();
+    }
+    return '';
+  };
+  const url = leer('SUPABASE_URL', 'REACT_APP_SUPABASE_URL').replace(/\/+$/, '');
+  const llave = leer('SUPABASE_ANON_KEY', 'REACT_APP_SUPABASE_ANON_KEY');
+  const faltantes = [];
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)) faltantes.push('REACT_APP_SUPABASE_URL');
+  if (!llave) faltantes.push('REACT_APP_SUPABASE_ANON_KEY');
+  if (!leer('AI_GATEWAY_API_KEY')) faltantes.push('AI_GATEWAY_API_KEY');
+  const ok = faltantes.length === 0;
+  return { ok, url: ok ? url : '', llave: ok ? llave : '', faltantes };
+}
+
 // ---------- Handler ----------
 
 export function extraerToken(req) {
@@ -293,6 +318,7 @@ export function extraerToken(req) {
  *  - registrar(evento) -> void   (bitácora sin texto ni token)
  *  - ahora() -> Date
  *  - limites -> LIMITES
+ *  - configuracion -> { ok, faltantes }  (opcional; si ok es false responde 503)
  */
 export function crearHandler(deps) {
   const limites = { ...LIMITES, ...(deps.limites || {}) };
@@ -312,6 +338,12 @@ export function crearHandler(deps) {
 
     if (req.method !== 'POST') {
       return terminar(405, { error: 'Método no permitido' }, 'rechazado', 'metodo');
+    }
+
+    // Falla cerrado: sin configuración del ambiente no se verifica sesión ni se llama a la IA.
+    if (deps.configuracion && deps.configuracion.ok === false) {
+      evento.faltantes = deps.configuracion.faltantes;
+      return terminar(503, { error: 'Servicio no configurado' }, 'error', 'sin_configuracion');
     }
 
     const token = extraerToken(req);

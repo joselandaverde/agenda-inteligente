@@ -11,23 +11,22 @@
 // de la IA campo por campo. La lógica está en _lib/interpretar-core.mjs; aquí
 // solo se conectan las dependencias reales.
 //
-// Secretos: AI_GATEWAY_API_KEY vive en Vercel, nunca en el navegador. La URL y
-// la llave *publishable* de Supabase son públicas por diseño; se leen de
-// variables de entorno y, mientras no existan (bloque 0-B), se usan los valores
-// públicos actuales.
+// Secretos: AI_GATEWAY_API_KEY vive en Vercel, nunca en el navegador ni en el
+// repositorio. La dirección y la llave pública de Supabase vienen de las
+// variables de entorno del ambiente (bloque 0-B); el código no trae valores
+// fijos. Si falta alguna, la función responde 503 y no llama a la IA.
 
 import { createClient } from '@supabase/supabase-js';
 import {
   LIMITES,
+  configuracionServidor,
   crearHandler,
   crearLimitadorMemoria,
 } from './_lib/interpretar-core.mjs';
 
-// No se usan las variables REACT_APP_SUPABASE_* de Vercel: su valor no está
-// verificado y un valor distinto haría fallar la verificación de sesión.
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://uxpktmrurvxqigiiharn.supabase.co';
-const SUPABASE_ANON_KEY =
-  process.env.SUPABASE_ANON_KEY || 'sb_publishable_UWLfZ0xy0jqGlJ5gQZGsNA_uDLKp1Nu';
+const configuracion = configuracionServidor(process.env);
+const SUPABASE_URL = configuracion.url;
+const SUPABASE_ANON_KEY = configuracion.llave;
 
 const limites = {
   ...LIMITES,
@@ -96,4 +95,4 @@ function registrar(evento) {
   console.info(JSON.stringify({ ...evento, ts: new Date().toISOString() }));
 }
 
-export default crearHandler({ verificarToken, registrarUso, llamarIA, registrar, limites });
+export default crearHandler({ verificarToken, registrarUso, llamarIA, registrar, limites, configuracion });

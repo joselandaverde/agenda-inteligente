@@ -2,6 +2,7 @@ node_modules/
 build/
 .env
 .env.*
+!.env.example
 .vercel/
 *.log
 .DS_Store
