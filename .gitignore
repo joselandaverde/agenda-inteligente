@@ -1,0 +1,11 @@
+node_modules/
+build/
+.env
+.env.*
+.vercel/
+*.log
+.DS_Store
+# Datos reales: nunca se versionan (Libro §5.7)
+*.sql.real
+carga_tareas_excel.sql
+respaldos/
