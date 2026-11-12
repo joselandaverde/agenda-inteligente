@@ -4,8 +4,10 @@ import Login from './Login';
 import Renglon from './componentes/Renglon';
 import Capturar from './pantallas/Capturar';
 import Detalle from './pantallas/Detalle';
+import Respaldo, { AvisoRespaldo, leerMarcas, guardarMarca } from './pantallas/Respaldo';
 import { Encabezado, EncabezadoDia, BarraNavegacion, BotonDictar, TiraSemana, Vacio } from './componentes/Armazon';
 import { fechaLocalISO, fechaLarga, formatoDuracion, gruposDeHoy, gruposProximos, resumen } from './logica/agenda.mjs';
+import { debeAvisar } from './logica/respaldo.mjs';
 
 export default function App() {
   const [sesion, setSesion] = useState(null);
@@ -28,6 +30,9 @@ export default function App() {
   const [capturaAbierta, setCapturaAbierta] = useState(false);
   const [aviso, setAviso] = useState('');
 
+  // Respaldo (bloque 0-C): fechas recordadas en este equipo
+  const [marcas, setMarcas] = useState({ ultimo: null, pospuesto: null });
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSesion(data.session);
@@ -48,6 +53,7 @@ export default function App() {
       cargarTareas();
       cargarCategorias();
       cargarSubtareas();
+      setMarcas(leerMarcas(sesion.user.id));
     }
   }, [sesion]);
 
@@ -215,6 +221,14 @@ export default function App() {
   const abiertos = tareas.filter((t) => t.state !== 'Hecho').length;
   const tareaAbierta = detalleId ? tareas.find((t) => t.id === detalleId) || null : null;
   const diasConAlgo = new Set(gruposProximos(tareas, hoyISO).filter((g) => g.tipo === 'dia').map((g) => g.clave));
+
+  const hayDatos = categorias.length + tareas.length + subtareas.length > 0;
+
+  function marcarRespaldo(cual) {
+    const iso = new Date().toISOString();
+    guardarMarca(sesion.user.id, cual, iso);
+    setMarcas((m) => ({ ...m, [cual]: iso }));
+  }
 
   function mostrarAviso(texto) {
     setAviso(texto);
@@ -453,6 +467,17 @@ export default function App() {
           ))}
         </div>
       </div>
+          <Respaldo
+            cliente={supabase}
+            ultimo={marcas.ultimo}
+            hayDatos={hayDatos}
+            alDescargar={() => marcarRespaldo('ultimo')}
+            alRestaurar={() => {
+              cargarCategorias();
+              cargarTareas();
+              cargarSubtareas();
+            }}
+          />
           <div className="ag-cuenta">
             <span>{sesion.user.email}</span>
             <button type="button" className="ag-boton-secundario" onClick={salir}>
@@ -473,6 +498,13 @@ export default function App() {
                 const grupo = document.getElementById('grupo-' + iso);
                 if (grupo) grupo.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}
+            />
+          )}
+          {pantalla === 'hoy' && debeAvisar(marcas.ultimo, marcas.pospuesto, new Date(), hayDatos) && (
+            <AvisoRespaldo
+              ultimo={marcas.ultimo}
+              alIr={() => setPantalla('categorias')}
+              alPosponer={() => marcarRespaldo('pospuesto')}
             />
           )}
           {gruposVisibles.length === 0 && (

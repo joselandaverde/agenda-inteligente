@@ -45,8 +45,18 @@ function datosIniciales() {
   return { projects, tasks, subtasks };
 }
 
+// Abrir la demostración con "?vacia" en la dirección la deja sin datos: sirve
+// para probar la restauración de un respaldo en una cuenta vacía.
+function empiezaVacia() {
+  try {
+    return new URLSearchParams(window.location.search).has('vacia');
+  } catch (e) {
+    return false;
+  }
+}
+
 export function crearClienteDemo() {
-  const tablas = datosIniciales();
+  const tablas = empiezaVacia() ? { projects: [], tasks: [], subtasks: [] } : datosIniciales();
   let contador = 1000;
   let sesion = { access_token: 'demostracion', user: { id: 'demo-usuario', email: 'demostracion@ejemplo.com' } };
   const oyentes = new Set();
@@ -54,10 +64,12 @@ export function crearClienteDemo() {
   function ejecutar(nombre, c) {
     const filas = tablas[nombre];
     if (!filas) return { data: null, error: { message: 'Tabla desconocida en la demostración: ' + nombre } };
-    const cumple = (f) => c.filtros.every(([col, val]) => f[col] === val);
+    const cumple = (f) => c.filtros.every(([col, val]) => f[col] === val) && c.listas.every(([col, vals]) => vals.includes(f[col]));
 
     if (c.op === 'insert') {
       const nuevas = (c.datos || []).map((d) => ({ id: 'demo-' + ++contador, user_id: 'demo-usuario', created_at: new Date().toISOString(), ...d }));
+      // Como la base real: un identificador no puede repetirse.
+      if (nuevas.some((n) => filas.some((f) => f.id === n.id))) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } };
       filas.push(...nuevas);
       return { data: c.unico ? nuevas[0] : nuevas, error: null };
     }
@@ -87,17 +99,20 @@ export function crearClienteDemo() {
         return (a < b ? -1 : 1) * (asc ? 1 : -1);
       });
     }
+    if (c.rango) resultado = resultado.slice(c.rango[0], c.rango[1] + 1);
     return { data: c.unico ? resultado[0] || null : resultado, error: null };
   }
 
   function from(nombre) {
-    const c = { op: 'select', filtros: [], orden: null, datos: null, unico: false };
+    const c = { op: 'select', filtros: [], listas: [], orden: null, rango: null, datos: null, unico: false };
     const api = {
       select: () => api,
       insert: (datos) => { c.op = 'insert'; c.datos = datos; return api; },
       update: (datos) => { c.op = 'update'; c.datos = datos; return api; },
       delete: () => { c.op = 'delete'; return api; },
       eq: (col, val) => { c.filtros.push([col, val]); return api; },
+      in: (col, vals) => { c.listas.push([col, vals]); return api; },
+      range: (desde, hasta) => { c.rango = [desde, hasta]; return api; },
       order: (col, opciones = {}) => { c.orden = [col, opciones.ascending !== false]; return api; },
       single: () => { c.unico = true; return api; },
       then: (bien, mal) => Promise.resolve().then(() => ejecutar(nombre, c)).then(bien, mal),

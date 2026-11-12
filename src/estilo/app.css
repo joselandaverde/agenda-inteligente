@@ -876,3 +876,81 @@ body {
   text-align: center;
   color: var(--ag-p1);
 }
+
+/* ---------- Respaldo (bloque 0-C) ---------- */
+.ag-respaldo {
+  margin-top: var(--ag-e4);
+  padding-top: var(--ag-e3);
+  border-top: 1px solid var(--ag-linea);
+  font-family: var(--ag-letra);
+}
+.ag-respaldo h3 {
+  margin: 0 0 var(--ag-e1);
+  font-size: var(--ag-t-m);
+  color: var(--ag-texto);
+}
+.ag-respaldo-texto {
+  margin: var(--ag-e2) 0 0;
+  font-size: var(--ag-t-s);
+  line-height: 1.4;
+  color: var(--ag-tenue);
+}
+.ag-respaldo-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ag-e2);
+  margin-top: var(--ag-e3);
+}
+.ag-respaldo-botones > button {
+  flex: 1 1 150px;
+}
+.ag-boton-secundario:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ag-respaldo-confirmar {
+  margin-top: var(--ag-e3);
+  padding: var(--ag-e3);
+  border: 1px solid var(--ag-linea);
+  border-radius: var(--ag-radio);
+  background: var(--ag-superficie);
+  font-size: var(--ag-t-s);
+  line-height: 1.4;
+  color: var(--ag-texto);
+  overflow-wrap: anywhere;
+}
+.ag-respaldo-confirmar p {
+  margin: 0;
+}
+.ag-nota.bien {
+  background: var(--ag-superficie);
+  color: var(--ag-texto);
+  border-left: 3px solid var(--ag-bien);
+}
+.ag-recordatorio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--ag-e3);
+  margin: 0 var(--ag-e4) var(--ag-e2);
+  padding: var(--ag-e1) var(--ag-e3);
+  border-radius: 10px;
+  background: var(--ag-alerta-suave);
+  color: var(--ag-alerta);
+  font-family: var(--ag-letra);
+  font-size: var(--ag-t-s);
+  line-height: 1.35;
+}
+.ag-recordatorio-acciones {
+  display: flex;
+  margin-left: auto;
+}
+.ag-recordatorio .ag-enlace {
+  color: var(--ag-alerta);
+  text-decoration: underline;
+}
+.ag-recordatorio .ag-enlace.tenue {
+  font-weight: 600;
+  text-decoration: none;
+}

@@ -17,6 +17,8 @@ Los dos archivos son independientes entre sí e idempotentes.
 - Nunca se versionan datos reales ni scripts que los contengan (`.gitignore`).
 - Cada cambio de esquema es un archivo nuevo; no se edita uno ya aplicado.
 - Cada migración trae al final su procedimiento de reversión.
+- Antes de aplicar una migración a producción se descarga un respaldo desde la
+  app ese mismo día (`docs/operacion/recuperacion.md`). Sin respaldo, no se aplica.
 
 ## Ambientes
 
