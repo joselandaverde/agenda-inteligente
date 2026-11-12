@@ -1,0 +1,52 @@
+/* Sistema visual de la app (bloque I). Único lugar donde se definen colores,
+   letra, tamaños y espacios. Los componentes solo usan estas variables. */
+:root {
+  /* Superficies y texto */
+  --ag-fondo: #ffffff;
+  --ag-superficie: #f4f5f7;
+  --ag-linea: #e8ebef;
+  --ag-texto: #1d232b;
+  --ag-tenue: #5f6975;
+  --ag-apagado: #b7bfc8;
+
+  /* Acento y estados */
+  --ag-acento: #24607e;
+  --ag-acento-suave: #e3eef3;
+  --ag-sobre-acento: #ffffff;
+  --ag-bien: #2f9460;
+  --ag-alerta: #a04b08;
+  --ag-alerta-suave: #fbeedd;
+
+  /* Importancia: de muy alta (1) a muy baja (5) */
+  --ag-p1: #c8382d;
+  --ag-p1-suave: #fbe7e4;
+  --ag-p2: #c9741c;
+  --ag-p3: #3c78d8;
+  --ag-p4: #7d8792;
+
+  /* Categorías: seis tonos que se repiten */
+  --ag-c0: #2f8f6b;
+  --ag-c1: #7a5ad0;
+  --ag-c2: #c7772a;
+  --ag-c3: #3c78d8;
+  --ag-c4: #b8457a;
+  --ag-c5: #5a7d2a;
+
+  /* Letra: la propia de cada equipo (decisión D3) */
+  --ag-letra: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --ag-t-xs: 11px;
+  --ag-t-s: 12.5px;
+  --ag-t-m: 15px;
+  --ag-t-l: 19px;
+  --ag-t-xl: 30px;
+
+  /* Espacios, radios y medidas */
+  --ag-e1: 4px;
+  --ag-e2: 8px;
+  --ag-e3: 12px;
+  --ag-e4: 16px;
+  --ag-radio: 12px;
+  --ag-ancho: 560px;
+  --ag-toque: 44px;
+  --ag-alto-barra: 60px;
+}

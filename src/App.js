@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import Login from './Login';
+import Renglon from './componentes/Renglon';
+import { Encabezado, EncabezadoDia, BarraNavegacion, BotonDictar, Hoja, Vacio } from './componentes/Armazon';
+import { fechaLocalISO, fechaLarga, formatoDuracion, gruposDeHoy, gruposProximos, resumen } from './logica/agenda.mjs';
 
 export default function App() {
   const [sesion, setSesion] = useState(null);
@@ -69,6 +72,11 @@ export default function App() {
   const [etNotas, setEtNotas] = useState('');
   const [etTiempoEstimado, setEtTiempoEstimado] = useState('30');
 
+  // Armazon nuevo (bloque I): pantalla visible, hoja de captura y aviso breve
+  const [pantalla, setPantalla] = useState('hoy');
+  const [capturaAbierta, setCapturaAbierta] = useState(false);
+  const [aviso, setAviso] = useState('');
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSesion(data.session);
@@ -122,14 +130,6 @@ export default function App() {
     return subtareas
       .filter((s) => s.task_id === taskId)
       .sort((a, b) => a.orden - b.orden);
-  }
-
-  // % de avance de una tarea (subtareas hechas / total)
-  function avanceDe(taskId) {
-    const subs = subtareasDe(taskId);
-    if (subs.length === 0) return null;
-    const hechas = subs.filter((s) => s.state === 'Hecho').length;
-    return Math.round((hechas / subs.length) * 100);
   }
 
   // Tiempo total estimado de una tarea (suma de sus subtareas)
@@ -639,6 +639,9 @@ export default function App() {
     setTiempoListaTemp('30');
     setMostrarPegarListaTemp(false);
     cargarTareas();
+    setCapturaAbierta(false);
+    setAviso(esContenedorDeSubtareas ? 'Tarea y ' + listaFinal.length + ' subtarea(s) guardadas' : 'Compromiso guardado');
+    setTimeout(() => setAviso(''), 3500);
   }
 
   // Marcar concluida / reabrir (rápido, sin expandir)
@@ -738,18 +741,6 @@ export default function App() {
     await supabase.auth.signOut();
   }
 
-  function formatearFechaHora(valor) {
-    if (!valor) return '';
-    const d = new Date(valor);
-    const fechaTxt = d.toLocaleDateString('es-MX');
-    const horaTxt = d.toLocaleTimeString('es-MX', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-    return fechaTxt + ' ' + horaTxt;
-  }
-
   if (cargando) {
     return <p style={{ padding: '40px', fontFamily: 'Arial' }}>Cargando...</p>;
   }
@@ -792,38 +783,45 @@ export default function App() {
   for (let i = 1; i <= categorias.length + 1; i++)
     opcionesPosicion.push(String(i));
 
+  // Datos para las pantallas nuevas: todo se calcula con lo que ya existe.
+  const hoyISO = fechaLocalISO();
+  const gruposHoy = gruposDeHoy(tareas, hoyISO);
+  const gruposVisibles = pantalla === 'hoy' ? gruposHoy : gruposProximos(tareas, hoyISO);
+  const resumenHoy = resumen((gruposHoy.find((g) => g.clave === hoyISO) || { tareas: [] }).tareas, subtareasDe);
+  const abiertos = tareas.filter((t) => t.state !== 'Hecho').length;
+
   return (
-    <div
-      style={{
-        padding: '20px',
-        fontFamily: 'Arial',
-        maxWidth: '600px',
-        margin: '0 auto',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <h1>Mi Agenda</h1>
-        <button
-          onClick={salir}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#eee',
-            border: 'none',
-            borderRadius: '4px',
-          }}
-        >
-          Salir
-        </button>
-      </div>
-      <p style={{ color: '#666', fontSize: '13px' }}>{sesion.user.email}</p>
+    <div className="ag-app">
+      <Encabezado
+        titulo={pantalla === 'hoy' ? 'Hoy' : pantalla === 'proximos' ? 'Próximos' : 'Categorías'}
+        subtitulo={
+          pantalla === 'hoy'
+            ? fechaLarga(hoyISO)
+            : pantalla === 'proximos'
+            ? abiertos + (abiertos === 1 ? ' compromiso abierto' : ' compromisos abiertos')
+            : 'En orden de prioridad'
+        }
+        total={pantalla === 'hoy' ? formatoDuracion(resumenHoy.totalMin) : ''}
+        porcentaje={pantalla === 'hoy' && resumenHoy.total > 0 ? resumenHoy.porcentaje : null}
+        nota={
+          pantalla === 'hoy' && resumenHoy.total > 0
+            ? (resumenHoy.totalMin > 0
+                ? (formatoDuracion(resumenHoy.hechoMin) || '0:00') +
+                  ' de ' +
+                  formatoDuracion(resumenHoy.totalMin) +
+                  ' planeadas · '
+                : '') +
+              resumenHoy.hechos +
+              ' de ' +
+              resumenHoy.total +
+              (resumenHoy.total === 1 ? ' hecho' : ' hechos')
+            : ''
+        }
+      />
 
       {/* Captura con IA: dicta (micrófono del teclado) o escribe libremente */}
+      {capturaAbierta && (
+        <Hoja titulo="Nuevo compromiso" alCerrar={() => setCapturaAbierta(false)}>
       <div
         style={{
           padding: '14px',
@@ -1530,8 +1528,12 @@ export default function App() {
       </button>
 
       {mensaje && <p>{mensaje}</p>}
+        </Hoja>
+      )}
 
       {/* Gestión de categorías */}
+      {pantalla === 'categorias' && (
+        <div className="ag-pantalla">
       <div
         style={{
           marginTop: '30px',
@@ -1717,114 +1719,50 @@ export default function App() {
           ))}
         </div>
       </div>
+          <div className="ag-cuenta">
+            <span>{sesion.user.email}</span>
+            <button type="button" className="ag-boton-secundario" onClick={salir}>
+              Salir
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* Lista de tareas */}
-      <h2 style={{ marginTop: '30px' }}>Mis tareas ({tareas.length})</h2>
-      {tareas.map((t, indiceTarea) => {
-        const concluida = t.state === 'Hecho';
-        const expandida = tareaExpandidaId === t.id;
-        const numeroTarea = indiceTarea + 1;
-        const subs = subtareasDe(t.id);
-        const avance = avanceDe(t.id);
-        const tiempoTotal = tiempoTotalDe(t.id);
-        return (
-          <div
-            key={t.id}
-            style={{
-              backgroundColor: concluida ? '#eef7ee' : '#f5f5f5',
-              borderRadius: '4px',
-              marginBottom: '10px',
-              borderLeft: '4px solid ' + (concluida ? '#4caf50' : '#007bff'),
-              overflow: 'hidden',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'flex-start', padding: '15px' }}>
-              {/* Casilla concluir (solo Tareas) */}
-              {t.type === 'Tarea' && (
-                <input
-                  type="checkbox"
-                  checked={concluida}
-                  onChange={() => alternarConcluida(t)}
-                  style={{ marginRight: '12px', marginTop: '3px', width: '18px', height: '18px', flexShrink: 0 }}
-                />
-              )}
-              {/* Contenido: click para expandir */}
-              <div
-                onClick={() => alternarExpansion(t)}
-                style={{ flex: 1, cursor: 'pointer' }}
-              >
-                <strong
-                  style={{
-                    textDecoration: concluida ? 'line-through' : 'none',
-                    color: concluida ? '#888' : '#000',
-                  }}
-                >
-                  <span style={{ color: '#007bff', marginRight: '6px' }}>
-                    {numeroTarea}.
-                  </span>
-                  {t.title}
-                </strong>
-                <br />
-                <small style={{ color: concluida ? '#999' : '#555' }}>
-                  {t.type} — {t.priority} — {t.state} —{' '}
-                  {t.date_promised
-                    ? formatearFechaHora(t.date_promised)
-                    : 'Sin fecha definida'}
-                </small>
-                {subs.length > 0 && (
-                  <div style={{ marginTop: '6px' }}>
-                    <div style={{ fontSize: '12px', color: '#555', marginBottom: '3px' }}>
-                      Avance: {avance}% ({subs.filter((s) => s.state === 'Hecho').length}/{subs.length} subtareas)
-                      {tiempoTotal > 0 ? ' · ' + tiempoTotal + ' min estimados' : ''}
-                    </div>
-                    <div style={{ height: '6px', backgroundColor: '#e0e0e0', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{ width: avance + '%', height: '100%', backgroundColor: '#4caf50' }} />
-                    </div>
-                  </div>
+      {/* Lista de compromisos, agrupada por dia */}
+      {pantalla !== 'categorias' && (
+        <div className="ag-lista">
+          {gruposVisibles.length === 0 && (
+            <Vacio
+              titulo={pantalla === 'hoy' ? 'Nada para hoy' : 'No hay compromisos'}
+              pista="Toca el botón redondo para dictar o escribir uno."
+            />
+          )}
+          {gruposVisibles.map((g) => (
+            <section key={g.clave} className="ag-grupo">
+              <EncabezadoDia
+                grupo={g}
+                hoyISO={hoyISO}
+                extra={formatoDuracion(
+                  resumen(g.tareas.filter((x) => x.state !== 'Hecho'), subtareasDe).totalMin
                 )}
-                {t.type === 'Tarea' && subs.length === 0 && t.time_estimated && (
-                  <div style={{ fontSize: '12px', color: '#555', marginTop: '4px' }}>
-                    ⏱ {t.time_estimated} min estimados
-                  </div>
-                )}
-                {t.type === 'Reunión' && t.time_estimated && (
-                  <div style={{ fontSize: '12px', color: '#555', marginTop: '4px' }}>
-                    ⏱ Dura {t.time_estimated} min
-                  </div>
-                )}
-                {t.repetition && t.repetition !== 'Ninguna' && (
-                  <div style={{ fontSize: '13px', color: '#555', marginTop: '4px' }}>
-                    🔁 Se repite: {t.repetition}
-                    {t.repetition_end
-                      ? ' (hasta ' +
-                        new Date(t.repetition_end).toLocaleDateString('es-MX') +
-                        ')'
-                      : ''}
-                  </div>
-                )}
-                {t.type === 'Tarea' && t.deadline && (
-                  <div style={{ fontSize: '13px', color: '#c55', marginTop: '4px' }}>
-                    ⏰ Fecha límite:{' '}
-                    {new Date(t.deadline).toLocaleDateString('es-MX')}
-                  </div>
-                )}
-                {t.type === 'Reunión' && t.location && (
-                  <div style={{ fontSize: '13px', color: '#555', marginTop: '4px' }}>
-                    📍 {t.location}
-                  </div>
-                )}
-                {t.notes && (
-                  <div style={{ fontSize: '13px', color: '#555', marginTop: '4px' }}>
-                    {t.type === 'Reunión' ? '💬' : '📝'} {t.notes}
-                  </div>
-                )}
-                {t.notification_channels && t.notification_channels.length > 0 && (
-                  <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                    🔔 {t.notification_channels[0]} · {t.reminder_minutes_before || 15} min antes
-                  </div>
-                )}
-              </div>
-            </div>
+              />
+              {g.tareas.map((t) => {
+                const expandida = tareaExpandidaId === t.id;
+                const numeroTarea = tareas.findIndex((x) => x.id === t.id) + 1;
+                const subs = subtareasDe(t.id);
+                const tiempoTotal = tiempoTotalDe(t.id);
+                return (
+                  <div key={t.id} className={'ag-item' + (expandida ? ' abierta' : '')}>
+                    <Renglon
+                      tarea={t}
+                      subtareas={subs}
+                      categoria={categorias.find((c) => c.id === t.project_id) || null}
+                      indiceCategoria={categorias.findIndex((c) => c.id === t.project_id)}
+                      abierta={expandida}
+                      hoyISO={hoyISO}
+                      alMarcar={() => alternarConcluida(t)}
+                      alAbrir={() => alternarExpansion(t)}
+                    />
 
             {/* Panel de edición expandible */}
             {expandida && (
@@ -2226,7 +2164,30 @@ export default function App() {
             )}
           </div>
         );
-      })}
+              })}
+            </section>
+          ))}
+        </div>
+      )}
+
+      {aviso && (
+        <div className="ag-aviso" role="status">
+          {aviso}
+        </div>
+      )}
+      <BotonDictar
+        alPulsar={() => {
+          setMensaje('');
+          setCapturaAbierta(true);
+        }}
+      />
+      <BarraNavegacion
+        pantalla={pantalla}
+        alCambiar={(p) => {
+          setTareaExpandidaId(null);
+          setPantalla(p);
+        }}
+      />
     </div>
   );
 }

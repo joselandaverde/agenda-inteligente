@@ -1,6 +1,6 @@
 import React from 'react';
 import { describirVersion } from './version.mjs';
-import { configuracion } from './supabaseClient';
+import { configuracion, esDemo } from './supabaseClient';
 
 // Franja superior que dice qué versión de la app está abierta y sobre qué base
 // de datos trabaja. En producción es discreta; en cualquier otro entorno es
@@ -24,6 +24,11 @@ export default function EtiquetaVersion() {
     fondo = '#f1f1f1';
     color = '#555';
     mensaje = texto;
+  }
+  if (esDemo) {
+    fondo = '#5b3fb5';
+    color = '#fff';
+    mensaje = 'DEMOSTRACIÓN — datos inventados, nada se guarda — ' + texto;
   }
 
   return (
