@@ -136,6 +136,7 @@ describe('respuesta de la IA', () => {
     const { cambios, advertencias } = aplicarInterpretacion({ titulo: 'Junta', tipo: 'Reunión', fecha: '2026-11-12', hora12: 10, minutos: 0, ampm: 'AM', importancia: 'Media', duracionMinutos: 60, advertencias: [] });
     assert.deepEqual(cambios, { titulo: 'Junta', tipo: 'Reunión', importancia: 'Media', fecha: '2026-11-12', hora12: '10', minutos: '00', ampm: 'AM', tiempoEstimado: '60' });
     assert.deepEqual(advertencias, []);
+    assert.equal(aplicarInterpretacion({ titulo: 'Junta' }).abrirMas, false);
   });
 
   test('una tarea con fecha activa la casilla de fecha y hora', () => {
@@ -156,7 +157,7 @@ describe('respuesta de la IA', () => {
 
   test('respuestas vacías o raras no rompen nada', () => {
     for (const d of [null, undefined, {}, { advertencias: 'x' }, { advertencias: [null, 5, ''] }]) {
-      assert.deepEqual(aplicarInterpretacion(d), { cambios: {}, advertencias: [] });
+      assert.deepEqual(aplicarInterpretacion(d), { cambios: {}, advertencias: [], abrirMas: false });
     }
   });
 

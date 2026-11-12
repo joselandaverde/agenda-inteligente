@@ -77,7 +77,9 @@ export default function Capturar({ categorias, alGuardar, alCerrar }) {
       const respuesta = await fetch('/api/interpretar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ texto: textoLibre, fechaLocal: fechaLocalISO(), zonaHoraria }),
+        // Decisión #49: a la IA se le envían los nombres de las categorías, y
+        // nada más, para que pueda elegir una.
+        body: JSON.stringify({ texto: textoLibre, fechaLocal: fechaLocalISO(), zonaHoraria, categorias: categorias.map((c) => c.name) }),
       });
 
       if (!respuesta.ok) {
@@ -86,9 +88,10 @@ export default function Capturar({ categorias, alGuardar, alCerrar }) {
         return;
       }
 
-      const { cambios, advertencias } = aplicarInterpretacion(await respuesta.json());
+      const { cambios, advertencias, abrirMas } = aplicarInterpretacion(await respuesta.json(), { categorias });
       poner(cambios);
       setDudosos(advertencias);
+      if (abrirMas) setMasOpciones(true);
       setMensajeIA(
         advertencias.length > 0
           ? 'No pude interpretar: ' + advertencias.join(', ') + '. Ese dato no se llenó: complétalo antes de crear.'
@@ -244,12 +247,12 @@ export default function Capturar({ categorias, alGuardar, alCerrar }) {
                 </select>
               </span>
             </Opcion>
-            <Opcion icono="repetir" etiqueta="Repetición">
+            <Opcion icono="repetir" etiqueta="Repetición" dudoso={esDudoso(dudosos, 'repetición')}>
               <select
                 className="ag-campo"
                 aria-label="Repetición"
                 value={f.repeticion}
-                onChange={(e) => poner(e.target.value === 'Ninguna' ? { repeticion: 'Ninguna', repeticionTieneFin: false, repeticionFin: '' } : { repeticion: e.target.value })}
+                onChange={(e) => corregir('repetición', e.target.value === 'Ninguna' ? { repeticion: 'Ninguna', repeticionTieneFin: false, repeticionFin: '' } : { repeticion: e.target.value })}
               >
                 {REPETICIONES.map((r) => (
                   <option key={r} value={r}>
@@ -288,8 +291,8 @@ export default function Capturar({ categorias, alGuardar, alCerrar }) {
           </select>
         </Opcion>
 
-        <Opcion icono="etiqueta" etiqueta="Categoría">
-          <select className="ag-campo" aria-label="Categoría" value={f.categoria} onChange={(e) => poner({ categoria: e.target.value })}>
+        <Opcion icono="etiqueta" etiqueta="Categoría" dudoso={esDudoso(dudosos, 'categoría')}>
+          <select className="ag-campo" aria-label="Categoría" value={f.categoria} onChange={(e) => corregir('categoría', { categoria: e.target.value })}>
             <option value="">Sin categoría</option>
             {categorias.map((c) => (
               <option key={c.id} value={c.id}>
@@ -299,8 +302,8 @@ export default function Capturar({ categorias, alGuardar, alCerrar }) {
           </select>
         </Opcion>
 
-        <Opcion icono="campana" etiqueta="Avisarme">
-          <Interruptor activo={f.quiereNotificacion} alCambiar={(v) => poner({ quiereNotificacion: v })} etiqueta="Quiero que me avise" />
+        <Opcion icono="campana" etiqueta="Avisarme" dudoso={esDudoso(dudosos, 'aviso')}>
+          <Interruptor activo={f.quiereNotificacion} alCambiar={(v) => corregir('aviso', { quiereNotificacion: v })} etiqueta="Quiero que me avise" />
         </Opcion>
         {f.quiereNotificacion && (
           <>
@@ -332,18 +335,18 @@ export default function Capturar({ categorias, alGuardar, alCerrar }) {
               <label className="ag-etq" htmlFor="captura-lugar">
                 Lugar
               </label>
-              <input id="captura-lugar" className="ag-campo ancho" type="text" value={f.lugar} onChange={(e) => poner({ lugar: e.target.value })} placeholder="Oficina, Zoom..." />
+              <input id="captura-lugar" className={'ag-campo ancho' + (esDudoso(dudosos, 'lugar') ? ' dudoso' : '')} type="text" value={f.lugar} onChange={(e) => corregir('lugar', { lugar: e.target.value })} placeholder="Oficina, Zoom..." />
               <label className="ag-etq" htmlFor="captura-participantes">
                 Participantes
               </label>
-              <input id="captura-participantes" className="ag-campo ancho" type="text" value={f.participantes} onChange={(e) => poner({ participantes: e.target.value })} placeholder="Separados por comas" />
+              <input id="captura-participantes" className={'ag-campo ancho' + (esDudoso(dudosos, 'participantes') ? ' dudoso' : '')} type="text" value={f.participantes} onChange={(e) => corregir('participantes', { participantes: e.target.value })} placeholder="Separados por comas" />
             </>
           )}
 
           {esTarea && (
             <>
-              <Opcion icono="bandera" etiqueta="Tiene fecha límite">
-                <Interruptor activo={f.tieneFechaLimite} alCambiar={(v) => poner({ tieneFechaLimite: v })} etiqueta="Tiene fecha límite" />
+              <Opcion icono="bandera" etiqueta="Tiene fecha límite" dudoso={esDudoso(dudosos, 'fecha límite')}>
+                <Interruptor activo={f.tieneFechaLimite} alCambiar={(v) => corregir('fecha límite', { tieneFechaLimite: v })} etiqueta="Tiene fecha límite" />
               </Opcion>
               {f.tieneFechaLimite && (
                 <Opcion icono="hoy" etiqueta="Fecha límite">
@@ -353,8 +356,8 @@ export default function Capturar({ categorias, alGuardar, alCerrar }) {
               <Opcion icono="repetir" etiqueta="Reagendar si no la termino">
                 <Interruptor activo={f.requiereConfirmacion} alCambiar={(v) => poner({ requiereConfirmacion: v })} etiqueta="Reagendar si no la marco como terminada" />
               </Opcion>
-              <Opcion icono="lista" etiqueta="Dividir en subtareas">
-                <Interruptor activo={f.tendraSubtareas} alCambiar={(v) => poner({ tendraSubtareas: v })} etiqueta="La voy a dividir en subtareas" />
+              <Opcion icono="lista" etiqueta="Dividir en subtareas" dudoso={esDudoso(dudosos, 'subtareas')}>
+                <Interruptor activo={f.tendraSubtareas} alCambiar={(v) => corregir('subtareas', { tendraSubtareas: v })} etiqueta="La voy a dividir en subtareas" />
               </Opcion>
 
               {f.tendraSubtareas && (
@@ -409,10 +412,10 @@ export default function Capturar({ categorias, alGuardar, alCerrar }) {
           </label>
           <textarea
             id="captura-notas"
-            className="ag-campo ancho"
+            className={'ag-campo ancho' + (esDudoso(dudosos, 'notas') ? ' dudoso' : '')}
             rows={3}
             value={f.notas}
-            onChange={(e) => poner({ notas: e.target.value })}
+            onChange={(e) => corregir('notas', { notas: e.target.value })}
             placeholder={f.tipo === 'Reunión' ? 'Agenda, temas a tratar o lo que se acordó...' : 'Opcional'}
           />
         </div>

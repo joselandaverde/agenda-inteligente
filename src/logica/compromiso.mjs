@@ -147,7 +147,7 @@ export function armarCompromiso(f) {
  * Cambios que la respuesta de la IA hace en el formulario. Solo toca los
  * campos que la IA sí entendió; lo demás queda como estaba.
  */
-export function aplicarInterpretacion(datosIA) {
+export function aplicarInterpretacion(datosIA, opciones = {}) {
   const d = datosIA || {};
   const cambios = {};
   if (d.titulo) cambios.titulo = d.titulo;
@@ -162,8 +162,58 @@ export function aplicarInterpretacion(datosIA) {
   if (d.ampm) cambios.ampm = d.ampm;
   if (d.duracionMinutos) cambios.tiempoEstimado = String(d.duracionMinutos);
   const advertencias = Array.isArray(d.advertencias) ? d.advertencias.filter((a) => typeof a === 'string' && a) : [];
-  return { cambios, advertencias };
+
+  // Datos ampliados (bloque IA-2). Llegan aparte, en "mas", ya validados por
+  // el servidor. `abrirMas` indica que se llenó o quedó en duda algo que vive
+  // dentro de "Más opciones", para mostrarlo antes de crear.
+  const mas = d.mas && typeof d.mas === 'object' && !Array.isArray(d.mas) ? d.mas : {};
+  let abrirMas = false;
+
+  const subtareas = Array.isArray(mas.subtareas) ? mas.subtareas.filter((s) => s && typeof s.titulo === 'string' && s.titulo.trim()) : [];
+  if (subtareas.length > 0) {
+    cambios.tendraSubtareas = true;
+    cambios.subtareas = subtareas.map((s) => ({ titulo: s.titulo.trim(), tiempo: Number.isInteger(s.minutos) && s.minutos > 0 ? s.minutos : 30 }));
+    abrirMas = true;
+  }
+  if (typeof mas.lugar === 'string' && mas.lugar) {
+    cambios.lugar = mas.lugar;
+    abrirMas = true;
+  }
+  if (Array.isArray(mas.participantes) && mas.participantes.length > 0) {
+    cambios.participantes = mas.participantes.filter((p) => typeof p === 'string' && p).join(', ');
+    abrirMas = true;
+  }
+  if (typeof mas.fechaLimite === 'string' && mas.fechaLimite) {
+    cambios.tieneFechaLimite = true;
+    cambios.fechaLimite = mas.fechaLimite;
+    abrirMas = true;
+  }
+  if (REPETICIONES.includes(mas.repeticion) && mas.repeticion !== 'Ninguna') {
+    cambios.repeticion = mas.repeticion;
+    if (typeof mas.repeticionFin === 'string' && mas.repeticionFin) {
+      cambios.repeticionTieneFin = true;
+      cambios.repeticionFin = mas.repeticionFin;
+    }
+  }
+  if (Number.isInteger(mas.avisoMinutosAntes) && mas.avisoMinutosAntes >= 0) {
+    cambios.quiereNotificacion = true;
+    cambios.minutosAntes = String(mas.avisoMinutosAntes);
+  }
+  if (typeof mas.notas === 'string' && mas.notas) {
+    cambios.notas = mas.notas;
+    abrirMas = true;
+  }
+  if (typeof mas.categoria === 'string' && mas.categoria) {
+    const hallada = (opciones.categorias || []).find((c) => c && c.name === mas.categoria);
+    if (hallada) cambios.categoria = hallada.id;
+  }
+  if (DATOS_EN_MAS_OPCIONES.some((dato) => esDudoso(advertencias, dato))) abrirMas = true;
+
+  return { cambios, advertencias, abrirMas };
 }
+
+// Datos que viven dentro de "Más opciones" en la captura.
+const DATOS_EN_MAS_OPCIONES = ['subtareas', 'lugar', 'participantes', 'fecha límite', 'notas'];
 
 /** Mensaje para el usuario según la respuesta del servidor de IA. */
 export function mensajeDeRespuesta(estado) {
