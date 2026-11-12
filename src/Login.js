@@ -7,17 +7,8 @@ export default function Login() {
   const [mensaje, setMensaje] = useState('');
   const [cargando, setCargando] = useState(false);
 
-  async function registrarse() {
-    setCargando(true);
-    setMensaje('Creando cuenta...');
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) {
-      setMensaje('Error: ' + error.message);
-    } else {
-      setMensaje('Cuenta creada. Ya puedes entrar.');
-    }
-    setCargando(false);
-  }
+  // El registro abierto se cerró (decisión de José, 2026-11-11): las cuentas
+  // nuevas las crea el propietario desde el panel de Supabase.
 
   async function entrar() {
     setCargando(true);
@@ -42,7 +33,7 @@ export default function Login() {
       }}
     >
       <h1>Mi Agenda</h1>
-      <p style={{ color: '#666' }}>Entra o crea tu cuenta</p>
+      <p style={{ color: '#666' }}>Entra con tu cuenta</p>
 
       <input
         type="email"
@@ -86,20 +77,6 @@ export default function Login() {
         }}
       >
         Entrar
-      </button>
-
-      <button
-        onClick={registrarse}
-        disabled={cargando}
-        style={{
-          padding: '12px 20px',
-          fontSize: '16px',
-          backgroundColor: '#eee',
-          border: 'none',
-          borderRadius: '4px',
-        }}
-      >
-        Crear cuenta
       </button>
 
       {mensaje && <p style={{ marginTop: '15px' }}>{mensaje}</p>}
