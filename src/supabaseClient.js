@@ -10,6 +10,17 @@ export const configuracion = leerConfiguracion({
   base: process.env.REACT_APP_BASE_DATOS,
 });
 
-export const supabase = configuracion.ok
-  ? createClient(configuracion.url, configuracion.llave)
-  : null;
+// Modo de demostración (bloque I): solo existe si la app se compila con
+// REACT_APP_DEMO=1 en una computadora de desarrollo. Usa datos inventados en
+// memoria y no se conecta a nada. En Vercel la variable no existe, la
+// condición es falsa al compilar y el código de demostración queda fuera.
+export const esDemo = process.env.REACT_APP_DEMO === '1';
+
+function crearCliente() {
+  if (process.env.REACT_APP_DEMO === '1') {
+    return require('./demo/clienteDemo').crearClienteDemo();
+  }
+  return configuracion.ok ? createClient(configuracion.url, configuracion.llave) : null;
+}
+
+export const supabase = crearCliente();

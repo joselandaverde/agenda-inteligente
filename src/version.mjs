@@ -2,7 +2,7 @@
 // VERSION_APP se cambia a mano en cada bloque; el entorno y el commit los
 // aporta Vercel al compilar (variables REACT_APP_VERCEL_*) y la base de datos
 // viene de REACT_APP_BASE_DATOS. Sin ellas, la etiqueta muestra solo la versión.
-export const VERSION_APP = '0-B';
+export const VERSION_APP = 'I-1';
 
 const NOMBRES_ENTORNO = {
   production: 'producción',
