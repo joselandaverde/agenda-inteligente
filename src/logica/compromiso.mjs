@@ -1,0 +1,180 @@
+// Lógica de la captura de un compromiso. Funciones puras, con pruebas.
+// Reproducen exactamente lo que hacía el formulario anterior dentro de App.js.
+
+const dos = (n) => String(n).padStart(2, '0');
+
+export const TIPOS = ['Reunión', 'Tarea', 'Recordatorio'];
+export const REPETICIONES = ['Ninguna', 'Diaria', 'Semanal', 'Mensual'];
+export const IMPORTANCIAS = [
+  { valor: 'Muy alta', texto: 'Muy alta — crítico' },
+  { valor: 'Alta', texto: 'Alta — importante' },
+  { valor: 'Media', texto: 'Media — normal' },
+  { valor: 'Baja', texto: 'Baja — puede esperar' },
+  { valor: 'Muy baja', texto: 'Muy baja — cuando haya tiempo' },
+];
+export const CANALES = [
+  { valor: 'App', texto: 'Notificación en la app' },
+  { valor: 'Correo', texto: 'Correo' },
+  { valor: 'Push', texto: 'Push al teléfono' },
+  { valor: 'WhatsApp', texto: 'WhatsApp' },
+];
+export const HORAS = Array.from({ length: 12 }, (_, i) => String(i + 1));
+export const MINUTOS = Array.from({ length: 12 }, (_, i) => dos(i * 5));
+
+/** Estado inicial del formulario. `hoyISO` es la fecha local AAAA-MM-DD. */
+export function formularioVacio(hoyISO) {
+  return {
+    titulo: '',
+    tipo: 'Tarea',
+    fecha: hoyISO,
+    hora12: '9',
+    minutos: '00',
+    ampm: 'AM',
+    categoria: '',
+    importancia: 'Media',
+    lugar: '',
+    participantes: '',
+    notas: '',
+    repeticion: 'Ninguna',
+    repeticionTieneFin: false,
+    repeticionFin: '',
+    tieneFechaLimite: false,
+    fechaLimite: '',
+    requiereConfirmacion: false,
+    tiempoEstimado: '30',
+    quiereNotificacion: false,
+    canalNotificacion: 'App',
+    minutosAntes: '15',
+    tendraSubtareas: false,
+    tieneFechaHora: false,
+    subtareas: [],
+    nuevaSubtareaTitulo: '',
+    nuevaSubtareaTiempo: '30',
+    textoLista: '',
+    tiempoLista: '30',
+  };
+}
+
+/** Hora de 12 horas con AM/PM a hora de 24 ("00" a "23"). */
+export function hora24(hora12, ampm) {
+  let h = parseInt(hora12, 10);
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return dos(h);
+}
+
+const minutosOTreinta = (valor) => {
+  const n = parseInt(valor, 10);
+  return !isNaN(n) && n > 0 ? n : 30;
+};
+
+/** Renglones no vacíos de un texto pegado. */
+export function lineasDe(texto) {
+  return String(texto || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+}
+
+/** ¿Se muestran fecha, hora y repetición para este formulario? */
+export function llevaFechaHora(f) {
+  if (f.tipo !== 'Tarea') return true;
+  return !f.tendraSubtareas && f.tieneFechaHora;
+}
+
+/**
+ * Convierte el formulario en lo que se guarda. Devuelve:
+ *  - error: texto si falta algo y no debe guardarse;
+ *  - datos: la fila para la tabla de compromisos;
+ *  - subtareas: lista de { titulo, tiempo } a crear después;
+ *  - confirmarRepeticion: true si hay que pedir confirmación antes de guardar.
+ */
+export function armarCompromiso(f) {
+  if (!String(f.titulo || '').trim()) return { error: 'Escribe un título primero' };
+
+  const esContenedor = f.tipo === 'Tarea' && f.tendraSubtareas;
+
+  // Si escribió una subtarea o pegó una lista y no pulsó "Agregar", se recoge
+  // aquí para no perderla.
+  let subtareas = [];
+  if (esContenedor) {
+    subtareas = [...(f.subtareas || [])];
+    if (String(f.nuevaSubtareaTitulo || '').trim()) {
+      subtareas.push({ titulo: f.nuevaSubtareaTitulo.trim(), tiempo: minutosOTreinta(f.nuevaSubtareaTiempo) });
+    }
+    const tiempoLista = minutosOTreinta(f.tiempoLista);
+    subtareas.push(...lineasDe(f.textoLista).map((l) => ({ titulo: l, tiempo: tiempoLista })));
+    if (subtareas.length === 0) {
+      return { error: 'Agrega al menos una subtarea, o desmarca la casilla de dividir.' };
+    }
+  }
+
+  const confirmarRepeticion = !esContenedor && f.repeticion !== 'Ninguna' && !f.repeticionTieneFin;
+  const sinFechaHora = f.tipo === 'Tarea' && (esContenedor || !f.tieneFechaHora);
+  const fechaHora = sinFechaHora ? null : f.fecha + 'T' + hora24(f.hora12, f.ampm) + ':' + f.minutos + ':00';
+
+  const datos = {
+    title: f.titulo,
+    type: f.tipo,
+    date_promised: fechaHora,
+    project_id: f.categoria || null,
+    priority: f.importancia,
+    state: 'Pendiente',
+    notes: f.notas || null,
+    repetition: esContenedor ? 'Ninguna' : f.repeticion,
+    repetition_end:
+      !esContenedor && f.repeticion !== 'Ninguna' && f.repeticionTieneFin && f.repeticionFin ? f.repeticionFin : null,
+    notification_channels: f.quiereNotificacion ? [f.canalNotificacion] : null,
+    reminder_minutes_before: f.quiereNotificacion ? parseInt(f.minutosAntes, 10) || 15 : null,
+  };
+
+  if (f.tipo === 'Reunión') {
+    datos.location = f.lugar || null;
+    datos.participantes = f.participantes ? f.participantes.split(',').map((p) => p.trim()) : null;
+    datos.time_estimated = minutosOTreinta(f.tiempoEstimado);
+  }
+
+  if (f.tipo === 'Tarea') {
+    datos.deadline = f.tieneFechaLimite && f.fechaLimite ? f.fechaLimite : null;
+    datos.requires_confirmation = f.requiereConfirmacion;
+    datos.time_estimated = minutosOTreinta(f.tiempoEstimado);
+  }
+
+  return { error: null, datos, subtareas, confirmarRepeticion };
+}
+
+/**
+ * Cambios que la respuesta de la IA hace en el formulario. Solo toca los
+ * campos que la IA sí entendió; lo demás queda como estaba.
+ */
+export function aplicarInterpretacion(datosIA) {
+  const d = datosIA || {};
+  const cambios = {};
+  if (d.titulo) cambios.titulo = d.titulo;
+  if (d.tipo) cambios.tipo = d.tipo;
+  if (d.importancia) cambios.importancia = d.importancia;
+  if (d.fecha) {
+    cambios.fecha = d.fecha;
+    if (d.tipo === 'Tarea') cambios.tieneFechaHora = true;
+  }
+  if (d.hora12) cambios.hora12 = String(d.hora12);
+  if (d.minutos !== null && d.minutos !== undefined) cambios.minutos = dos(d.minutos);
+  if (d.ampm) cambios.ampm = d.ampm;
+  if (d.duracionMinutos) cambios.tiempoEstimado = String(d.duracionMinutos);
+  const advertencias = Array.isArray(d.advertencias) ? d.advertencias.filter((a) => typeof a === 'string' && a) : [];
+  return { cambios, advertencias };
+}
+
+/** Mensaje para el usuario según la respuesta del servidor de IA. */
+export function mensajeDeRespuesta(estado) {
+  if (estado === 401) return 'Tu sesión expiró. Vuelve a entrar para usar la IA.';
+  if (estado === 413) return 'El texto es demasiado largo (máximo 1,000 caracteres).';
+  if (estado === 429) return 'Alcanzaste el límite de interpretaciones por hora. Intenta más tarde.';
+  return 'No se pudo interpretar. Intenta de nuevo.';
+}
+
+/** ¿La advertencia de la IA se refiere a este dato? ("hora", "fecha", "duración"...) */
+export function esDudoso(advertencias, dato) {
+  const limpio = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return (advertencias || []).some((a) => limpio(a) === limpio(dato));
+}

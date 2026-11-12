@@ -41,6 +41,20 @@ const TRAZOS = {
       <circle cx="8.5" cy="8.5" r="1.2" />
     </>
   ),
+  reloj: (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 8v4.5l3 2" />
+    </>
+  ),
+  cronometro: (
+    <>
+      <circle cx="12" cy="13.5" r="6.5" />
+      <path d="M12 10v3.5M10 3.5h4M12 3.5V7" />
+    </>
+  ),
+  bandera: <path d="M6 21V4M6 5h11l-2 4 2 4H6" />,
+  lista: <path d="M9 7h10M9 12h10M9 17h10M5 7h.2M5 12h.2M5 17h.2" />,
   repetir: (
     <>
       <path d="M5 11a7 7 0 0 1 12-4l2 2M19 13a7 7 0 0 1-12 4l-2-2" />

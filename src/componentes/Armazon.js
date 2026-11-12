@@ -81,7 +81,7 @@ export function BotonDictar({ alPulsar }) {
   );
 }
 
-export function Hoja({ titulo, alCerrar, children }) {
+export function Hoja({ titulo, alCerrar, textoCerrar = 'Cerrar', children }) {
   // Mientras la hoja está abierta, la página de atrás no se desplaza.
   useEffect(() => {
     const previo = document.body.style.overflow;
@@ -97,7 +97,7 @@ export function Hoja({ titulo, alCerrar, children }) {
         <div className="ag-hoja-cab">
           <h2>{titulo}</h2>
           <button type="button" className="ag-enlace" onClick={alCerrar}>
-            Cerrar
+            {textoCerrar}
           </button>
         </div>
         {children}
