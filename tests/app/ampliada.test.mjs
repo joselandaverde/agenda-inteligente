@@ -1,7 +1,7 @@
 // Cómo aplica la captura los datos ampliados de la IA (bloque IA-2). Sin red.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { formularioVacio, aplicarInterpretacion, armarCompromiso } from '../../src/logica/compromiso.mjs';
+import { formularioVacio, aplicarInterpretacion, armarCompromiso, formularioInterpretado } from '../../src/logica/compromiso.mjs';
 
 const HOY = '2026-11-11';
 const CATEGORIAS = [{ id: 'c1', name: 'Finanzas' }, { id: 'c2', name: 'Casa' }];
@@ -63,6 +63,35 @@ describe('datos ampliados en la captura', () => {
   test('valores raros en lo ampliado no rompen ni llenan nada', () => {
     for (const mas of [null, 'x', [], { subtareas: 'a', participantes: 'b', fechaLimite: 5, repeticion: 'Quincenal', avisoMinutosAntes: -1, notas: 7, categoria: 9, lugar: {} }]) {
       assert.deepEqual(aplicar({ mas }), { cambios: {}, advertencias: [], abrirMas: false });
+    }
+  });
+
+  test('una interpretación nueva no arrastra nada de la anterior', () => {
+    const opciones = { categorias: CATEGORIAS };
+    const primera = formularioInterpretado(HOY, { titulo: 'Mudanza', tipo: 'Tarea', fecha: '2026-11-13', hora12: 4, minutos: '30', ampm: 'PM', importancia: 'Alta', duracionMinutos: 90, mas: { subtareas: [{ titulo: 'Cotizar camión', minutos: 20 }], fechaLimite: '2026-11-20', notas: 'Pedir cajas', categoria: 'Casa', avisoMinutosAntes: 30, repeticion: 'Semanal' } }, opciones);
+    assert.equal(primera.formulario.tendraSubtareas, true);
+    assert.equal(primera.abrirMas, true);
+
+    const segunda = formularioInterpretado(HOY, { titulo: 'Comprar tóner', tipo: 'Tarea', advertencias: [] }, opciones);
+    assert.deepEqual(segunda.formulario, { ...formularioVacio(HOY), titulo: 'Comprar tóner', tipo: 'Tarea' });
+    assert.equal(segunda.abrirMas, false);
+    assert.deepEqual(segunda.advertencias, []);
+
+    // Y lo que se guardaría es una tarea sencilla, sin restos de la primera.
+    const guardar = armarCompromiso(segunda.formulario);
+    assert.deepEqual(guardar.subtareas, []);
+    assert.equal(guardar.datos.deadline, null);
+    assert.equal(guardar.datos.notes, null);
+    assert.equal(guardar.datos.project_id, null);
+    assert.equal(guardar.datos.date_promised, null);
+    assert.equal(guardar.datos.repetition, 'Ninguna');
+    assert.equal(guardar.datos.notification_channels, null);
+    assert.equal(guardar.datos.time_estimated, 30);
+  });
+
+  test('una respuesta vacía deja el formulario como recién abierto', () => {
+    for (const datos of [null, undefined, {}]) {
+      assert.deepEqual(formularioInterpretado(HOY, datos).formulario, formularioVacio(HOY));
     }
   });
 
