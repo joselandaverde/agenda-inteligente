@@ -6,7 +6,7 @@ import { guardarCompromiso } from '../datos/compromisos';
 import { fechaLocalISO } from '../logica/agenda.mjs';
 import {
   TIPOS, REPETICIONES, IMPORTANCIAS, CANALES, HORAS, MINUTOS,
-  formularioVacio, armarCompromiso, aplicarInterpretacion, mensajeDeRespuesta, esDudoso, lineasDe, llevaFechaHora,
+  formularioVacio, armarCompromiso, formularioInterpretado, mensajeDeRespuesta, esDudoso, lineasDe, llevaFechaHora,
 } from '../logica/compromiso.mjs';
 
 // Un renglón del formulario: ícono, nombre del dato y su control a la derecha.
@@ -88,10 +88,14 @@ export default function Capturar({ categorias, alGuardar, alCerrar }) {
         return;
       }
 
-      const { cambios, advertencias, abrirMas } = aplicarInterpretacion(await respuesta.json(), { categorias });
-      poner(cambios);
+      // Cada interpretación reemplaza el formulario completo: no se mezcla
+      // con lo que dejó la anterior ni con lo tecleado antes.
+      const { formulario, advertencias, abrirMas } = formularioInterpretado(fechaLocalISO(), await respuesta.json(), { categorias });
+      setF(formulario);
       setDudosos(advertencias);
-      if (abrirMas) setMasOpciones(true);
+      setMasOpciones(abrirMas);
+      setPegarLista(false);
+      setMensaje('');
       setMensajeIA(
         advertencias.length > 0
           ? 'No pude interpretar: ' + advertencias.join(', ') + '. Ese dato no se llenó: complétalo antes de crear.'

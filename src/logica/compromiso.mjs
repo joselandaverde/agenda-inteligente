@@ -212,6 +212,16 @@ export function aplicarInterpretacion(datosIA, opciones = {}) {
   return { cambios, advertencias, abrirMas };
 }
 
+/**
+ * Formulario que resulta de una interpretación. Parte siempre de un formulario
+ * vacío: cada dictado describe un compromiso nuevo, así que nada de lo que
+ * dejó una interpretación anterior (subtareas, lugar, fecha...) se arrastra.
+ */
+export function formularioInterpretado(hoyISO, datosIA, opciones = {}) {
+  const { cambios, advertencias, abrirMas } = aplicarInterpretacion(datosIA, opciones);
+  return { formulario: { ...formularioVacio(hoyISO), ...cambios }, advertencias, abrirMas };
+}
+
 // Datos que viven dentro de "Más opciones" en la captura.
 const DATOS_EN_MAS_OPCIONES = ['subtareas', 'lugar', 'participantes', 'fecha límite', 'notas'];
 
