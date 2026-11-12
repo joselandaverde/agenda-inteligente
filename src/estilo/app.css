@@ -700,3 +700,179 @@ body {
   margin: 0;
   flex: 1;
 }
+
+/* ---------- Tira de la semana (Próximos) ---------- */
+.ag-semana {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding: var(--ag-e1) var(--ag-e3) 0;
+  border-bottom: 1px solid var(--ag-linea);
+}
+.ag-semana button {
+  min-height: 56px;
+  padding: 0 0 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font-size: 10.5px;
+  color: var(--ag-tenue);
+  cursor: pointer;
+}
+.ag-semana button:disabled {
+  cursor: default;
+}
+.ag-semana b {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ag-texto);
+}
+.ag-semana .pasado b {
+  color: var(--ag-apagado);
+}
+.ag-semana .hoy {
+  border-bottom-color: var(--ag-acento);
+}
+.ag-semana .hoy b {
+  color: var(--ag-acento);
+}
+.ag-semana i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}
+.ag-semana i.punto {
+  background: var(--ag-tenue);
+}
+
+/* ---------- Detalle de un compromiso (entrega I-2) ---------- */
+.ag-detalle-cuando {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--ag-toque);
+}
+.ag-detalle-fecha {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--ag-t-s);
+  font-weight: 700;
+  color: var(--ag-acento);
+}
+.ag-chip {
+  flex: none;
+  font-size: var(--ag-t-xs);
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 20px;
+  background: var(--ag-superficie);
+  color: var(--ag-tenue);
+}
+.ag-chip.p1 {
+  background: var(--ag-p1-suave);
+  color: var(--ag-p1);
+}
+.ag-chip.p2 {
+  background: var(--ag-alerta-suave);
+  color: var(--ag-alerta);
+}
+.ag-chip.p3 {
+  background: var(--ag-acento-suave);
+  color: var(--ag-acento);
+}
+.ag-datos {
+  list-style: none;
+  margin: var(--ag-e3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ag-e2);
+}
+.ag-datos li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--ag-superficie);
+  font-size: var(--ag-t-s);
+  color: var(--ag-tenue);
+}
+.ag-datos .ag-icono {
+  width: 14px;
+  height: 14px;
+}
+.ag-detalle-subtareas {
+  margin-top: var(--ag-e4);
+}
+.ag-detalle-avance {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--ag-t-s);
+  color: var(--ag-tenue);
+  font-variant-numeric: tabular-nums;
+}
+.ag-detalle-avance strong {
+  color: var(--ag-texto);
+}
+.ag-subfila {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-e2);
+  min-height: var(--ag-toque);
+  border-bottom: 1px solid var(--ag-linea);
+  font-size: 14px;
+}
+.ag-subfila .ag-marca-boton {
+  margin: 0 -6px 0 -11px;
+}
+.ag-subfila .ag-marca {
+  width: 20px;
+  height: 20px;
+}
+.ag-subfila-texto {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ag-subfila.hecha .ag-subfila-texto {
+  color: var(--ag-tenue);
+  text-decoration: line-through;
+}
+.ag-mini {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ag-superficie);
+  color: var(--ag-tenue);
+  font-size: 11px;
+  cursor: pointer;
+}
+.ag-mini:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ag-mini.peligro {
+  background: var(--ag-p1-suave);
+  color: var(--ag-p1);
+}
+.ag-boton-secundario.ancho {
+  display: block;
+  width: 100%;
+  margin-top: var(--ag-e2);
+}
+.ag-enlace.peligro {
+  display: block;
+  width: 100%;
+  margin-top: var(--ag-e2);
+  padding: 0;
+  text-align: center;
+  color: var(--ag-p1);
+}
