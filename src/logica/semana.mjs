@@ -1,6 +1,7 @@
 // Lógica de la vista de computadora (entrega I-4): la semana por columnas y
 // el calendario del mes. Funciones puras, con pruebas.
-import { diaEfectivo, horaCorta, nivelImportancia, partesDia, repartir, sumarDias } from './agenda.mjs';
+import { diaEfectivo, fechaLocalISO, horaCorta, nivelImportancia, partesDia, repartir, sumarDias } from './agenda.mjs';
+import { compararPorOrden, estaCalificada } from './puntaje.mjs';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const dos = (n) => String(n).padStart(2, '0');
@@ -59,24 +60,21 @@ export function subtareasDeTarjeta(subtareas, maximo = 3) {
 
 /**
  * Todas las tareas abiertas (no reuniones ni recordatorios), tengan fecha o
- * no. Primero las que traen orden sugerido (bloque 1-A), de mayor a menor;
- * después, las más importantes; con la misma importancia, primero la de
- * fecha más cercana y al final las que no tienen fecha.
+ * no. Primero las que tienen puntaje, de mayor a menor orden (calculado con la
+ * fecha del día, bloque 3-A); después, las que no lo tienen: las más
+ * importantes primero; con la misma importancia, la de fecha más cercana y al
+ * final las que no tienen fecha.
  */
-// Orden sugerido de una tarea; las que no lo tienen van después de todas.
-const ordenDe = (t) => {
-  const n = t.orden_sugerido === null || t.orden_sugerido === undefined || t.orden_sugerido === '' ? NaN : Number(t.orden_sugerido);
-  return Number.isFinite(n) ? n : -1;
-};
-
-export function tareasAbiertas(tareas) {
+export function tareasAbiertas(tareas, hoyISO = fechaLocalISO()) {
   const lejos = '9999-99-99';
+  const porOrden = compararPorOrden(hoyISO);
   return (tareas || [])
     .filter((t) => t.type === 'Tarea' && t.state !== 'Hecho')
     .sort((x, y) => {
-      const ox = ordenDe(x);
-      const oy = ordenDe(y);
-      if (ox !== oy) return oy - ox;
+      const cx = estaCalificada(x);
+      const cy = estaCalificada(y);
+      if (cx !== cy) return cx ? -1 : 1;
+      if (cx) return porOrden(x, y);
       const porImportancia = nivelImportancia(x.priority) - nivelImportancia(y.priority);
       if (porImportancia !== 0) return porImportancia;
       const porDia = (diaEfectivo(x) || lejos).localeCompare(diaEfectivo(y) || lejos);

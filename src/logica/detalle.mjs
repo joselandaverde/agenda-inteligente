@@ -1,6 +1,8 @@
 // Lógica de la pantalla de detalle de un compromiso. Funciones puras, con
 // pruebas. Reproducen lo que hacía el panel de edición dentro de App.js.
 import { hora24 } from './compromiso.mjs';
+import { prioridadDe, cambiosDePrioridad } from './prioridad.mjs';
+import { explicarPuntaje } from './puntaje.mjs';
 
 const dos = (n) => String(n).padStart(2, '0');
 
@@ -76,7 +78,7 @@ export function semanaDe(hoyISO) {
   });
 }
 
-// ---------- Prioridad (bloque 1-A) ----------
+// ---------- Prioridad (bloques 1-A y 3-A) ----------
 
 export const DELEGABLES = ['Solo yo', 'Parcial', 'Delegable'];
 
@@ -85,35 +87,35 @@ export function admitePrioridad(t) {
   return Boolean(t) && Object.prototype.hasOwnProperty.call(t, 'retomar_el');
 }
 
-/** Los dos datos de prioridad que se editan en el detalle. */
+/** Datos de prioridad editables en el detalle: los de calificación y los dos de 1-A. */
 export function edicionPrioridad(t) {
-  return { retomarEl: t.retomar_el ? String(t.retomar_el).slice(0, 10) : '', delegable: t.delegable || '' };
+  return { ...prioridadDe(t), retomarEl: t.retomar_el ? String(t.retomar_el).slice(0, 10) : '', delegable: t.delegable || '' };
 }
 
-/** Cambios de prioridad a guardar. */
-export function cambiosPrioridad(e) {
+/**
+ * Cambios de prioridad a guardar. Con la tarea y la fecha del día, si algo que
+ * cuenta para el puntaje cambió se actualiza también el puntaje de referencia.
+ */
+export function cambiosPrioridad(e, t, hoyISO) {
   return {
+    ...cambiosDePrioridad(t, e, hoyISO),
     retomar_el: /^\d{4}-\d{2}-\d{2}$/.test(e.retomarEl || '') ? e.retomarEl : null,
     delegable: DELEGABLES.includes(e.delegable) ? e.delegable : null,
   };
 }
 
 /**
- * Datos de prioridad que solo se consultan, en lenguaje llano. Devuelve una
- * lista de { nombre, valor }; vacía si la tarea no tiene ninguno.
+ * Datos de prioridad que solo se consultan, en lenguaje llano: el puntaje de
+ * hoy y de dónde sale, y el grupo. Lista de { nombre, valor }.
  */
-export function datosDePrioridad(t) {
+export function datosDePrioridad(t, hoyISO) {
   const datos = [];
-  const numero = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
-  const puntaje = numero(t.puntaje);
-  if (puntaje !== null && Number.isFinite(puntaje)) datos.push({ nombre: 'Puntaje', valor: String(Math.round(puntaje * 10) / 10) });
-  const impactos = [['Generar', t.impact_generar], ['Proteger', t.impact_proteger], ['Político', t.impact_politico], ['Personal', t.impact_personal]]
-    .filter(([, v]) => numero(v) !== null)
-    .map(([n, v]) => n + ' ' + Number(v));
-  if (impactos.length > 0) datos.push({ nombre: 'Impacto (0 a 2)', valor: impactos.join(' · ') });
-  if (t.urgency_category) datos.push({ nombre: 'Urgencia', valor: t.urgency_category });
-  if (t.esfuerzo) datos.push({ nombre: 'Esfuerzo', valor: t.esfuerzo });
-  if (t.me_esperan === true || t.me_esperan === false) datos.push({ nombre: '¿Te esperan?', valor: t.me_esperan ? 'Sí' : 'No' });
+  const p = explicarPuntaje(t, hoyISO);
+  if (p.puntaje === null) datos.push({ nombre: 'Puntaje', valor: 'Sin puntaje: califica al menos un impacto' });
+  else {
+    datos.push({ nombre: 'Puntaje', valor: String(p.puntaje) });
+    datos.push({ nombre: 'De dónde sale', valor: p.texto });
+  }
   if (t.grupo) datos.push({ nombre: 'Grupo', valor: t.grupo });
   return datos;
 }

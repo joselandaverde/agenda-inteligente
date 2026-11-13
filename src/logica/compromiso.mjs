@@ -1,6 +1,9 @@
 // Lógica de la captura de un compromiso. Funciones puras, con pruebas.
 // Reproducen exactamente lo que hacía el formulario anterior dentro de App.js.
 
+import { fechaLocalISO } from './agenda.mjs';
+import { prioridadVacia, columnasParaCrear } from './prioridad.mjs';
+
 const dos = (n) => String(n).padStart(2, '0');
 
 export const TIPOS = ['Reunión', 'Tarea', 'Recordatorio'];
@@ -52,6 +55,8 @@ export function formularioVacio(hoyISO) {
     nuevaSubtareaTiempo: '30',
     textoLista: '',
     tiempoLista: '30',
+    // Prioridad (bloque 3-A), solo para tareas; todo opcional.
+    prioridad: prioridadVacia(),
   };
 }
 
@@ -88,8 +93,9 @@ export function llevaFechaHora(f) {
  *  - datos: la fila para la tabla de compromisos;
  *  - subtareas: lista de { titulo, tiempo } a crear después;
  *  - confirmarRepeticion: true si hay que pedir confirmación antes de guardar.
+ * `hoyISO` es el día de hoy, para el puntaje de referencia de una tarea calificada.
  */
-export function armarCompromiso(f) {
+export function armarCompromiso(f, hoyISO = fechaLocalISO()) {
   if (!String(f.titulo || '').trim()) return { error: 'Escribe un título primero' };
 
   const esContenedor = f.tipo === 'Tarea' && f.tendraSubtareas;
@@ -138,6 +144,9 @@ export function armarCompromiso(f) {
     datos.deadline = f.tieneFechaLimite && f.fechaLimite ? f.fechaLimite : null;
     datos.requires_confirmation = f.requiereConfirmacion;
     datos.time_estimated = minutosOTreinta(f.tiempoEstimado);
+    // Prioridad: solo se guardan los datos que se llenaron, y el puntaje de
+    // referencia si hay algún impacto. La fecha límite es la de arriba.
+    Object.assign(datos, columnasParaCrear({ ...f.prioridad, fechaLimite: datos.deadline || '' }, hoyISO));
   }
 
   return { error: null, datos, subtareas, confirmarRepeticion };
