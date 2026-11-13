@@ -1489,3 +1489,8 @@ body {
     bottom: var(--ag-e4);
   }
 }
+
+/* ---------- Prioridad editable (bloque 3-A) ---------- */
+.ag-prioridad .ag-opciones {
+  margin-top: var(--ag-e2);
+}

@@ -19,7 +19,9 @@ function datosIniciales() {
 
   const sinPrioridad = { impact_generar: null, impact_proteger: null, impact_politico: null, impact_personal: null, urgency_category: null, esfuerzo: null, delegable: null, me_esperan: null, retomar_el: null, grupo: null, puntaje: null, orden_sugerido: null, origen: null, lote_carga: null };
   const base = { user_id: usuario, state: 'Pendiente', priority: 'Media', repetition: 'Ninguna', project_id: null, date_promised: null, deadline: null, notes: null, location: null, time_estimated: 30, ...sinPrioridad };
-  // Como las que entran en la carga inicial (bloque 1-A): con puntaje, impactos y grupo.
+  // Como las que entran en la carga inicial (bloque 1-A): con impactos y grupo. El puntaje que
+  // se ve lo calcula la app con la fecha del día (bloque 3-A); estas columnas son solo referencia.
+  const sinImpactos = { impact_generar: null, impact_proteger: null, impact_politico: null, impact_personal: null };
   const cargada = (n, puntaje, extra) => ({ ...base, id: 't-c' + n, type: 'Tarea', time_estimated: null, impact_generar: 1, impact_proteger: 1, impact_politico: 0, impact_personal: 0, puntaje, orden_sugerido: puntaje, origen: 'excel:' + n, lote_carga: 'lote-demo', ...extra });
   const tasks = [
     { ...base, id: 't-1', title: 'Junta con el contador', type: 'Reunión', date_promised: momento(0, '10:00'), time_estimated: 60, location: 'Oficina', project_id: 'cat-1' },
@@ -34,12 +36,12 @@ function datosIniciales() {
     { ...base, id: 't-10', title: 'Ordenar el archivo fiscal', type: 'Tarea', priority: 'Baja', time_estimated: 90, project_id: 'cat-1' },
     { ...base, id: 't-11', title: 'Comprar tóner', type: 'Tarea', priority: 'Muy baja', time_estimated: 20 },
     cargada(1, 84.5, { title: 'Preparar la declaración anual', project_id: 'cat-1', grupo: 'Fiscal', impact_generar: 2, impact_proteger: 2, urgency_category: 'Fecha dura', esfuerzo: 'Grande', delegable: 'Parcial', me_esperan: true, deadline: dia(20) }),
-    cargada(2, 40, { title: 'Actualizar el expediente del banco', project_id: 'cat-1', grupo: 'Bancos' }),
-    cargada(3, 40, { title: 'Revisar pólizas vigentes', project_id: 'cat-2', grupo: 'Seguros' }),
+    cargada(2, 40, { title: 'Actualizar el expediente del banco', project_id: 'cat-1', grupo: 'Bancos', impact_generar: 2, impact_proteger: 0, esfuerzo: 'Rápido' }),
+    cargada(3, 40, { title: 'Revisar pólizas vigentes', project_id: 'cat-2', grupo: 'Seguros', impact_generar: 0, impact_proteger: 2, impact_personal: 1 }),
     cargada(4, 40, { title: 'Depurar correos pendientes', grupo: 'Orden', retomar_el: dia(10) }),
     cargada(5, 25, { title: 'Cotizar impermeabilización', project_id: 'cat-3', grupo: 'Mantenimiento', esfuerzo: 'Medio' }),
-    cargada(6, 25, { title: 'Ordenar la bodega', project_id: 'cat-3', grupo: 'Mantenimiento' }),
-    cargada(7, 12.5, { title: 'Renovar suscripciones', grupo: 'Orden' }),
+    cargada(6, 25, { title: 'Ordenar la bodega', project_id: 'cat-3', grupo: 'Mantenimiento', ...sinImpactos, puntaje: null, orden_sugerido: null }),
+    cargada(7, 12.5, { title: 'Renovar suscripciones', grupo: 'Orden', ...sinImpactos, puntaje: null, orden_sugerido: null }),
     { ...base, id: 't-12', title: 'Cotizar seguro del auto', type: 'Tarea', state: 'Hecho', date_promised: momento(-3, '11:00'), date_completed: momento(-3, '12:00'), time_estimated: 30 },
   ];
 
