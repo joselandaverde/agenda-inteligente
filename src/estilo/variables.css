@@ -49,4 +49,11 @@
   --ag-ancho: 560px;
   --ag-toque: 44px;
   --ag-alto-barra: 60px;
+
+  /* Vista de computadora (entrega I-4) */
+  --ag-velo: rgba(29, 35, 43, 0.38);
+  --ag-ancho-lateral: 236px;
+  --ag-ancho-columna: 256px;
+  --ag-ancho-panel: 480px;
+  --ag-ancho-lectura: 640px;
 }

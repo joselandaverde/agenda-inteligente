@@ -1,10 +1,36 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Icono from './Icono';
 import { partesDia } from '../logica/agenda.mjs';
 import { semanaDe } from '../logica/detalle.mjs';
 
 // Piezas del armazón de la app: encabezado de pantalla, encabezado de cada
 // grupo de la lista, barra inferior, botón de dictado, hoja y estado vacío.
+
+// Ancho desde el que la app cambia a la vista de computadora. Es el mismo
+// número que usa la hoja de estilos (app.css) en sus reglas de pantalla ancha.
+const CONSULTA_COMPUTADORA = '(min-width: 900px)';
+
+/** Dice si la pantalla es ancha; se actualiza al girar o cambiar el tamaño. */
+export function usarComputadora() {
+  const hayConsulta = typeof window !== 'undefined' && typeof window.matchMedia === 'function';
+  const [ancha, setAncha] = useState(() => (hayConsulta ? window.matchMedia(CONSULTA_COMPUTADORA).matches : false));
+
+  useEffect(() => {
+    if (!hayConsulta) return undefined;
+    const consulta = window.matchMedia(CONSULTA_COMPUTADORA);
+    const alCambiar = (evento) => setAncha(evento.matches);
+    setAncha(consulta.matches);
+    // Safari antiguo solo conoce addListener.
+    if (consulta.addEventListener) consulta.addEventListener('change', alCambiar);
+    else consulta.addListener(alCambiar);
+    return () => {
+      if (consulta.removeEventListener) consulta.removeEventListener('change', alCambiar);
+      else consulta.removeListener(alCambiar);
+    };
+  }, [hayConsulta]);
+
+  return ancha;
+}
 
 export function Encabezado({ titulo, subtitulo, total, porcentaje, nota }) {
   return (
