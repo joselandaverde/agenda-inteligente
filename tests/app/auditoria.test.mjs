@@ -195,7 +195,9 @@ describe('lenguaje llano', () => {
 });
 
 describe('migración del registro', () => {
-  const sql = readFileSync(join(raiz, 'supabase/migrations/20261112_audit_log.sql'), 'utf8');
+  // En Windows, git puede dejar el archivo con saltos de línea de dos
+  // caracteres (retorno y salto): se igualan a uno solo antes de revisar.
+  const sql = readFileSync(join(raiz, 'supabase/migrations/20261112_audit_log.sql'), 'utf8').replace(/\r\n/g, '\n');
 
   test('la seguridad por fila está activa y solo hay reglas para leer y agregar', () => {
     assert.match(sql, /alter table public\.audit_log enable row level security;/);

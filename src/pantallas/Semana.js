@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Icono from '../componentes/Icono';
 import { Encabezado, Vacio } from '../componentes/Armazon';
 import { AvisoRespaldo } from './Respaldo';
-import { diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, nivelImportancia, partesDia, repartir, resumen } from '../logica/agenda.mjs';
+import { diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, nivelImportancia, partesDia, repartir, resumen, sugeridas } from '../logica/agenda.mjs';
 import { abiertosPorCategoria, filtrarPorCategoria, tonoDe } from '../logica/categorias.mjs';
 import { columnasDesde, cuandoEs, mesDe, subtareasDeTarjeta, tareasAbiertas } from '../logica/semana.mjs';
 
@@ -74,8 +74,10 @@ function Tarjeta({ tarea, subtareas, categoria, indiceCategoria, hoyISO, conDia,
           <span className="ag-categoria">
             <i className={'ag-punto c' + tonoDe(indiceCategoria)} />
             {categoria.name}
+            {tarea.grupo ? ' · ' + tarea.grupo : ''}
           </span>
         )}
+        {!categoria && tarea.grupo && <span className="ag-categoria">{tarea.grupo}</span>}
       </div>
     </article>
   );
@@ -146,7 +148,12 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
   const filtroVigente = categorias.some((c) => c.id === filtro) ? filtro : '';
   const visibles = filtrarPorCategoria(tareas, filtroVigente);
   const reparto = repartir(visibles, hoyISO);
-  const columnas = columnasDesde(visibles, hoyISO, inicio);
+  const columnasDeDias = columnasDesde(visibles, hoyISO, inicio);
+  // Bloque 1-A: si la semana empieza hoy, primero las tareas sugeridas por
+  // puntaje que no estén ya en lo vencido ni en hoy.
+  const yaALaVista = columnasDeDias.filter((c) => c.tipo === 'vencidos' || c.clave === hoyISO).flatMap((c) => c.tareas);
+  const tareasSugeridas = inicio === hoyISO ? sugeridas(visibles, hoyISO, 5, yaALaVista) : [];
+  const columnas = tareasSugeridas.length > 0 ? [{ clave: 'sugeridas', tipo: 'sugeridas', tareas: tareasSugeridas }, ...columnasDeDias] : columnasDeDias;
   const diasConAlgo = new Set(reparto.dias.filter((d) => d.tareas.some((t) => t.state !== 'Hecho')).map((d) => d.clave));
   const categoriaFiltro = categorias.find((c) => c.id === filtroVigente) || null;
 
@@ -236,10 +243,10 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
               const pendiente = formatoDuracion(resumen(col.tareas.filter((t) => t.state !== 'Hecho'), subtareasDe).totalMin);
               const p = col.tipo === 'dia' ? partesDia(col.clave, hoyISO) : null;
               return (
-                <section key={col.clave} className={'ag-columna' + (col.tipo === 'vencidos' ? ' alerta' : '')} aria-label={p ? fechaLarga(col.clave) : 'Vencidos'}>
+                <section key={col.clave} className={'ag-columna' + (col.tipo === 'vencidos' ? ' alerta' : '')} aria-label={p ? fechaLarga(col.clave) : col.tipo === 'sugeridas' ? 'Sugeridas' : 'Vencidos'}>
                   <h2 className="ag-columna-enc">
-                    <b>{p ? mayuscula(p.nombre) : 'Vencidos'}</b>
-                    <span>{p ? p.numero + ' de ' + p.mes + (p.relativo ? ' · ' + p.relativo : '') : 'Su día ya pasó'}</span>
+                    <b>{p ? mayuscula(p.nombre) : col.tipo === 'sugeridas' ? 'Sugeridas' : 'Vencidos'}</b>
+                    <span>{p ? p.numero + ' de ' + p.mes + (p.relativo ? ' · ' + p.relativo : '') : col.tipo === 'sugeridas' ? 'Por puntaje' : 'Su día ya pasó'}</span>
                   </h2>
                   <div className="ag-avance" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={r.porcentaje} aria-label="Avance del día">
                     <span style={{ width: r.porcentaje + '%' }} />

@@ -955,6 +955,37 @@ body {
   text-decoration: none;
 }
 
+/* ---------- Prioridad en el detalle (bloque 1-A) ---------- */
+.ag-prioridad {
+  margin-top: var(--ag-e2);
+}
+.ag-prioridad-datos {
+  margin: 0;
+  padding: var(--ag-e2) var(--ag-e3);
+  border-radius: var(--ag-radio);
+  background: var(--ag-superficie);
+  font-size: var(--ag-t-s);
+  line-height: 1.4;
+}
+.ag-prioridad-datos div {
+  display: flex;
+  gap: var(--ag-e3);
+  padding: 3px 0;
+}
+.ag-prioridad-datos dt {
+  flex: none;
+  width: 118px;
+  color: var(--ag-tenue);
+}
+.ag-prioridad-datos dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-weight: 600;
+  color: var(--ag-texto);
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Actividad (bloque 0-D) ---------- */
 .ag-actividad {
   margin-top: var(--ag-e4);

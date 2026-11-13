@@ -75,3 +75,45 @@ export function semanaDe(hoyISO) {
     return { iso, letra, numero: f.getDate(), esHoy: iso === hoyISO, pasado: iso < hoyISO };
   });
 }
+
+// ---------- Prioridad (bloque 1-A) ----------
+
+export const DELEGABLES = ['Solo yo', 'Parcial', 'Delegable'];
+
+/** ¿La base ya tiene las columnas de prioridad? Antes de la migración no vienen en la fila. */
+export function admitePrioridad(t) {
+  return Boolean(t) && Object.prototype.hasOwnProperty.call(t, 'retomar_el');
+}
+
+/** Los dos datos de prioridad que se editan en el detalle. */
+export function edicionPrioridad(t) {
+  return { retomarEl: t.retomar_el ? String(t.retomar_el).slice(0, 10) : '', delegable: t.delegable || '' };
+}
+
+/** Cambios de prioridad a guardar. */
+export function cambiosPrioridad(e) {
+  return {
+    retomar_el: /^\d{4}-\d{2}-\d{2}$/.test(e.retomarEl || '') ? e.retomarEl : null,
+    delegable: DELEGABLES.includes(e.delegable) ? e.delegable : null,
+  };
+}
+
+/**
+ * Datos de prioridad que solo se consultan, en lenguaje llano. Devuelve una
+ * lista de { nombre, valor }; vacía si la tarea no tiene ninguno.
+ */
+export function datosDePrioridad(t) {
+  const datos = [];
+  const numero = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
+  const puntaje = numero(t.puntaje);
+  if (puntaje !== null && Number.isFinite(puntaje)) datos.push({ nombre: 'Puntaje', valor: String(Math.round(puntaje * 10) / 10) });
+  const impactos = [['Generar', t.impact_generar], ['Proteger', t.impact_proteger], ['Político', t.impact_politico], ['Personal', t.impact_personal]]
+    .filter(([, v]) => numero(v) !== null)
+    .map(([n, v]) => n + ' ' + Number(v));
+  if (impactos.length > 0) datos.push({ nombre: 'Impacto (0 a 2)', valor: impactos.join(' · ') });
+  if (t.urgency_category) datos.push({ nombre: 'Urgencia', valor: t.urgency_category });
+  if (t.esfuerzo) datos.push({ nombre: 'Esfuerzo', valor: t.esfuerzo });
+  if (t.me_esperan === true || t.me_esperan === false) datos.push({ nombre: '¿Te esperan?', valor: t.me_esperan ? 'Sí' : 'No' });
+  if (t.grupo) datos.push({ nombre: 'Grupo', valor: t.grupo });
+  return datos;
+}

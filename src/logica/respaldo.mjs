@@ -7,7 +7,7 @@ export const VERSION_FORMATO = 1;
 // En este orden se restaura: primero lo que otros necesitan.
 export const TABLAS = ['projects', 'tasks', 'subtasks'];
 // Migraciones con las que se creó la estructura que guarda estos datos.
-export const ESQUEMA = ['20261111_esquema_base', '20261103_ai_usage'];
+export const ESQUEMA = ['20261111_esquema_base', '20261103_ai_usage', '20261113_prioridad'];
 export const DIAS_AVISO = 7;
 
 // El dueño de cada fila cambia al restaurar en otra cuenta: no entra en la
