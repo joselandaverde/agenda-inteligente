@@ -4,13 +4,14 @@ import { Encabezado, Vacio } from '../componentes/Armazon';
 import { AvisoRespaldo } from './Respaldo';
 import { diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, nivelImportancia, partesDia, repartir, resumen } from '../logica/agenda.mjs';
 import { abiertosPorCategoria, filtrarPorCategoria, tonoDe } from '../logica/categorias.mjs';
-import { columnasDesde, mesDe, subtareasDeTarjeta } from '../logica/semana.mjs';
+import { columnasDesde, cuandoEs, mesDe, subtareasDeTarjeta, tareasAbiertas } from '../logica/semana.mjs';
 
 const mayuscula = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1);
 
 // Un compromiso dentro de una columna: enseña su hora, sus primeras subtareas,
 // su duración y su categoría. El título lo abre; el círculo lo marca.
-function Tarjeta({ tarea, subtareas, categoria, indiceCategoria, hoyISO, alMarcar, alAbrir }) {
+// Fuera de la columna de un día (`conDia`), la tarjeta dice también su fecha.
+function Tarjeta({ tarea, subtareas, categoria, indiceCategoria, hoyISO, conDia, alMarcar, alAbrir }) {
   const hecha = tarea.state === 'Hecho';
   const esTarea = tarea.type === 'Tarea';
   const importancia = tarea.priority || 'Media';
@@ -18,15 +19,18 @@ function Tarjeta({ tarea, subtareas, categoria, indiceCategoria, hoyISO, alMarca
   const hora = tarea.date_promised ? horaCorta(tarea.date_promised) : '';
   const { visibles, resto } = subtareasDeTarjeta(esTarea ? subtareas : []);
 
+  const cuando = conDia ? cuandoEs(tarea, hoyISO) : null;
+
+  // Si la tarjeta ya dice su fecha y esa fecha es la límite, no se repite.
   let limite = '';
-  if (esTarea && tarea.deadline) {
+  if (esTarea && tarea.deadline && !(cuando && !tarea.date_promised)) {
     const p = partesDia(diaDe(tarea.deadline), hoyISO);
     limite = 'Límite: ' + (p.relativo || p.nombre + ' ' + p.numero);
   }
 
   return (
     <article className={'ag-tarjeta' + (hecha ? ' hecha' : '')}>
-      {hora && <span className="ag-hora">{hora}</span>}
+      {cuando ? <span className={'ag-tarjeta-cuando' + (cuando.vencida ? ' vencida' : '')}>{cuando.texto}</span> : hora && <span className="ag-hora">{hora}</span>}
       <button type="button" className="ag-tarjeta-titulo" onClick={alAbrir}>
         {tarea.title}
       </button>
@@ -129,7 +133,7 @@ function ItemLateral({ texto, cantidad, activo, tono, alPulsar }) {
   );
 }
 
-const TITULOS = { semana: 'Semana', sinFecha: 'Sin fecha', hechos: 'Hechas', categorias: 'Categorías' };
+const TITULOS = { semana: 'Semana', tareas: 'Tareas', sinFecha: 'Sin fecha', hechos: 'Hechas', categorias: 'Categorías' };
 
 // Vista de computadora: a la izquierda el mes y las categorías para filtrar;
 // al centro, un día por columna. Todo sale de los mismos datos que el teléfono.
@@ -146,9 +150,15 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
   const diasConAlgo = new Set(reparto.dias.filter((d) => d.tareas.some((t) => t.state !== 'Hecho')).map((d) => d.clave));
   const categoriaFiltro = categorias.find((c) => c.id === filtroVigente) || null;
 
+  const pendientes = tareasAbiertas(visibles);
+  // En las vistas que no van por día, cada tarjeta dice su fecha.
+  const listas = { tareas: pendientes, sinFecha: reparto.sinFecha, hechos: reparto.hechos };
+  const vacios = { tareas: 'No hay tareas abiertas', sinFecha: 'Nada sin fecha', hechos: 'Aún no hay compromisos hechos' };
+
   const tarjeta = (t) => (
     <Tarjeta
       key={t.id}
+      conDia={ver === 'tareas' || ver === 'hechos'}
       tarea={t}
       subtareas={subtareasDe(t.id)}
       categoria={categorias.find((c) => c.id === t.project_id) || null}
@@ -160,6 +170,7 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
   );
 
   let subtitulo = fechaLarga(hoyISO);
+  if (ver === 'tareas') subtitulo = 'Todas las tareas abiertas, de la más importante a la menos';
   if (ver === 'sinFecha') subtitulo = 'Compromisos abiertos que aún no tienen día';
   if (ver === 'hechos') subtitulo = 'Lo que ya quedó concluido';
   if (ver === 'categorias') subtitulo = 'En orden de prioridad';
@@ -187,6 +198,7 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
 
         <div className="ag-lateral-etq">Ver</div>
         <ItemLateral texto="Semana" activo={ver === 'semana'} alPulsar={() => setVer('semana')} />
+        <ItemLateral texto="Tareas" cantidad={pendientes.length} activo={ver === 'tareas'} alPulsar={() => setVer('tareas')} />
         <ItemLateral texto="Sin fecha" cantidad={reparto.sinFecha.length} activo={ver === 'sinFecha'} alPulsar={() => setVer('sinFecha')} />
         <ItemLateral texto="Hechas" activo={ver === 'hechos'} alPulsar={() => setVer('hechos')} />
         <ItemLateral texto="Administrar categorías" activo={ver === 'categorias'} alPulsar={() => setVer('categorias')} />
@@ -248,12 +260,10 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
           </div>
         )}
 
-        {(ver === 'sinFecha' || ver === 'hechos') && (
+        {listas[ver] && (
           <>
-            {(ver === 'sinFecha' ? reparto.sinFecha : reparto.hechos).length === 0 && (
-              <Vacio titulo={ver === 'sinFecha' ? 'Nada sin fecha' : 'Aún no hay compromisos hechos'} pista={categoriaFiltro ? 'En la categoría ' + categoriaFiltro.name + '.' : ''} />
-            )}
-            <div className="ag-mosaico">{(ver === 'sinFecha' ? reparto.sinFecha : reparto.hechos).map(tarjeta)}</div>
+            {listas[ver].length === 0 && <Vacio titulo={vacios[ver]} pista={categoriaFiltro ? 'En la categoría ' + categoriaFiltro.name + '.' : ''} />}
+            <div className="ag-mosaico">{listas[ver].map(tarjeta)}</div>
           </>
         )}
 

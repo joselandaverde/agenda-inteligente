@@ -1,6 +1,6 @@
 // Lógica de la vista de computadora (entrega I-4): la semana por columnas y
 // el calendario del mes. Funciones puras, con pruebas.
-import { repartir, sumarDias } from './agenda.mjs';
+import { diaEfectivo, horaCorta, nivelImportancia, partesDia, repartir, sumarDias } from './agenda.mjs';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const dos = (n) => String(n).padStart(2, '0');
@@ -55,4 +55,39 @@ export function subtareasDeTarjeta(subtareas, maximo = 3) {
   const lista = subtareas || [];
   if (lista.length <= maximo) return { visibles: lista, resto: 0 };
   return { visibles: lista.slice(0, maximo), resto: lista.length - maximo };
+}
+
+/**
+ * Todas las tareas abiertas (no reuniones ni recordatorios), tengan fecha o
+ * no: primero las más importantes; con la misma importancia, primero la de
+ * fecha más cercana y al final las que no tienen fecha.
+ */
+export function tareasAbiertas(tareas) {
+  const lejos = '9999-99-99';
+  return (tareas || [])
+    .filter((t) => t.type === 'Tarea' && t.state !== 'Hecho')
+    .sort((x, y) => {
+      const porImportancia = nivelImportancia(x.priority) - nivelImportancia(y.priority);
+      if (porImportancia !== 0) return porImportancia;
+      const porDia = (diaEfectivo(x) || lejos).localeCompare(diaEfectivo(y) || lejos);
+      if (porDia !== 0) return porDia;
+      return String(x.title || '').localeCompare(String(y.title || ''));
+    });
+}
+
+/**
+ * Cuándo es un compromiso, para una tarjeta que no está dentro de la columna
+ * de un día: "Venció el 9 de julio", "hoy · 10:00 a. m.", "sábado 14 de
+ * noviembre", "Sin fecha". Devuelve { texto, vencida }.
+ */
+export function cuandoEs(tarea, hoyISO) {
+  const dia = diaEfectivo(tarea);
+  if (!dia) return { texto: 'Sin fecha', vencida: false };
+  const p = partesDia(dia, hoyISO);
+  const anio = dia.slice(0, 4) !== hoyISO.slice(0, 4) ? ' de ' + dia.slice(0, 4) : '';
+  const fecha = p.numero + ' de ' + p.mes + anio;
+  const hora = tarea.date_promised ? ' · ' + horaCorta(tarea.date_promised) : '';
+  const vencida = tarea.state !== 'Hecho' && dia < hoyISO;
+  if (vencida) return { texto: 'Venció ' + (p.relativo || 'el ' + fecha), vencida: true };
+  return { texto: (p.relativo || p.nombre + ' ' + fecha) + hora, vencida: false };
 }

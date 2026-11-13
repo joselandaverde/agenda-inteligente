@@ -2,7 +2,7 @@
 // un día (src/logica/compromiso.mjs). Sin red ni navegador.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { columnasDesde, mesDe, subtareasDeTarjeta } from '../../src/logica/semana.mjs';
+import { columnasDesde, cuandoEs, mesDe, subtareasDeTarjeta, tareasAbiertas } from '../../src/logica/semana.mjs';
 import { formularioDelDia, formularioInterpretado, formularioVacio, armarCompromiso } from '../../src/logica/compromiso.mjs';
 
 const HOY = '2026-11-12'; // jueves
@@ -102,6 +102,48 @@ describe('subtareas en una tarjeta', () => {
     assert.deepEqual(subtareasDeTarjeta(subs.slice(0, 3)), { visibles: subs.slice(0, 3), resto: 0 });
     assert.deepEqual(subtareasDeTarjeta([]), { visibles: [], resto: 0 });
     assert.deepEqual(subtareasDeTarjeta(null), { visibles: [], resto: 0 });
+  });
+});
+
+describe('vista Tareas', () => {
+  const lista = [
+    tarea(1, { priority: 'Media', date_promised: '2026-11-20T09:00:00' }),
+    tarea(2, { priority: 'Muy alta' }), // sin fecha
+    tarea(3, { priority: 'Media', deadline: '2026-11-10' }), // vencida
+    tarea(4, { priority: 'Muy alta', date_promised: '2026-12-31T09:00:00' }),
+    tarea(5, { priority: 'Baja', state: 'Hecho' }),
+    tarea(6, { type: 'Reunión', priority: 'Muy alta', date_promised: '2026-11-12T10:00:00' }),
+    tarea(7, { type: 'Recordatorio', date_promised: '2026-11-12T18:00:00' }),
+    tarea(8, { priority: 'Media' }), // sin fecha
+  ];
+
+  test('solo tareas abiertas: ni reuniones, ni recordatorios, ni lo hecho', () => {
+    assert.deepEqual(tareasAbiertas(lista).map((t) => t.id).sort(), [1, 2, 3, 4, 8]);
+    assert.deepEqual(tareasAbiertas([]), []);
+    assert.deepEqual(tareasAbiertas(null), []);
+  });
+
+  test('por importancia; con la misma, la fecha más cercana primero y lo sin fecha al final', () => {
+    assert.deepEqual(tareasAbiertas(lista).map((t) => t.id), [4, 2, 3, 1, 8]);
+  });
+
+  test('no cambia la lista original', () => {
+    const copia = lista.map((t) => t.id);
+    tareasAbiertas(lista);
+    assert.deepEqual(lista.map((t) => t.id), copia);
+  });
+
+  test('cuándo es: sin fecha, vencida, hoy con hora, otro día y otro año', () => {
+    assert.deepEqual(cuandoEs(tarea(1), HOY), { texto: 'Sin fecha', vencida: false });
+    assert.deepEqual(cuandoEs(tarea(1, { deadline: '2026-07-09' }), HOY), { texto: 'Venció el 9 de julio', vencida: true });
+    assert.deepEqual(cuandoEs(tarea(1, { date_promised: '2026-11-11T09:00:00' }), HOY), { texto: 'Venció ayer', vencida: true });
+    assert.deepEqual(cuandoEs(tarea(1, { date_promised: '2026-11-12T10:00:00' }), HOY), { texto: 'hoy · 10:00 a. m.', vencida: false });
+    assert.deepEqual(cuandoEs(tarea(1, { deadline: '2026-11-14' }), HOY), { texto: 'sábado 14 de noviembre', vencida: false });
+    assert.deepEqual(cuandoEs(tarea(1, { date_promised: '2027-01-04T16:30:00' }), HOY), { texto: 'lunes 4 de enero de 2027 · 4:30 p. m.', vencida: false });
+  });
+
+  test('lo hecho con fecha pasada no cuenta como vencido', () => {
+    assert.deepEqual(cuandoEs(tarea(1, { state: 'Hecho', date_promised: '2026-11-01T09:00:00' }), HOY), { texto: 'domingo 1 de noviembre · 9:00 a. m.', vencida: false });
   });
 });
 

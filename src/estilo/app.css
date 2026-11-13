@@ -1302,6 +1302,15 @@ body {
   font-size: var(--ag-t-xs);
   line-height: 1.1;
 }
+.ag-tarjeta-cuando {
+  font-size: var(--ag-t-xs);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ag-tenue);
+}
+.ag-tarjeta-cuando.vencida {
+  color: var(--ag-alerta);
+}
 .ag-tarjeta-titulo {
   padding: 0;
   border: 0;
