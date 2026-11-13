@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Icono from '../componentes/Icono';
 import { Encabezado, Vacio } from '../componentes/Armazon';
 import { AvisoRespaldo } from './Respaldo';
-import { diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, nivelImportancia, partesDia, repartir, resumen, sugeridas } from '../logica/agenda.mjs';
+import { SUGERIDAS_EN_HOY, diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, nivelImportancia, partesDia, repartir, resumen, sugeridas } from '../logica/agenda.mjs';
 import { abiertosPorCategoria, filtrarPorCategoria, tonoDe } from '../logica/categorias.mjs';
 import { columnasDesde, cuandoEs, mesDe, subtareasDeTarjeta, tareasAbiertas } from '../logica/semana.mjs';
 
@@ -149,15 +149,15 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
   const visibles = filtrarPorCategoria(tareas, filtroVigente);
   const reparto = repartir(visibles, hoyISO);
   const columnasDeDias = columnasDesde(visibles, hoyISO, inicio);
-  // Bloque 1-A: si la semana empieza hoy, primero las tareas sugeridas por
-  // puntaje que no estén ya en lo vencido ni en hoy.
+  // Si la semana empieza hoy, primero las tareas sugeridas por puntaje (las
+  // cuatro de mayor puntaje del día) que no estén ya en lo vencido ni en hoy.
   const yaALaVista = columnasDeDias.filter((c) => c.tipo === 'vencidos' || c.clave === hoyISO).flatMap((c) => c.tareas);
-  const tareasSugeridas = inicio === hoyISO ? sugeridas(visibles, hoyISO, 5, yaALaVista) : [];
+  const tareasSugeridas = inicio === hoyISO ? sugeridas(visibles, hoyISO, SUGERIDAS_EN_HOY, yaALaVista) : [];
   const columnas = tareasSugeridas.length > 0 ? [{ clave: 'sugeridas', tipo: 'sugeridas', tareas: tareasSugeridas }, ...columnasDeDias] : columnasDeDias;
   const diasConAlgo = new Set(reparto.dias.filter((d) => d.tareas.some((t) => t.state !== 'Hecho')).map((d) => d.clave));
   const categoriaFiltro = categorias.find((c) => c.id === filtroVigente) || null;
 
-  const pendientes = tareasAbiertas(visibles);
+  const pendientes = tareasAbiertas(visibles, hoyISO);
   // En las vistas que no van por día, cada tarjeta dice su fecha.
   const listas = { tareas: pendientes, sinFecha: reparto.sinFecha, hechos: reparto.hechos };
   const vacios = { tareas: 'No hay tareas abiertas', sinFecha: 'Nada sin fecha', hechos: 'Aún no hay compromisos hechos' };
@@ -177,7 +177,7 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
   );
 
   let subtitulo = fechaLarga(hoyISO);
-  if (ver === 'tareas') subtitulo = 'Todas las tareas abiertas, de la más importante a la menos';
+  if (ver === 'tareas') subtitulo = 'Todas las tareas abiertas, de mayor a menor puntaje';
   if (ver === 'sinFecha') subtitulo = 'Compromisos abiertos que aún no tienen día';
   if (ver === 'hechos') subtitulo = 'Lo que ya quedó concluido';
   if (ver === 'categorias') subtitulo = 'En orden de prioridad';

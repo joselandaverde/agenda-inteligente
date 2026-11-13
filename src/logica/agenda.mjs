@@ -4,6 +4,11 @@
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
+import { compararPorOrden, estaCalificada } from './puntaje.mjs';
+
+/** Cuántas tareas sugeridas muestra Hoy: las cuatro de mayor puntaje (decisión #56). */
+export const SUGERIDAS_EN_HOY = 4;
+
 const dos = (n) => String(n).padStart(2, '0');
 
 /** Fecha local de un Date como AAAA-MM-DD. */
@@ -167,12 +172,6 @@ export function gruposProximos(tareas, hoyISO) {
   return grupos;
 }
 
-// Número de una tarea que entró en la carga inicial ("excel:23" → 23).
-function numeroDeOrigen(t) {
-  const m = /^excel:(\d+)$/.exec(String(t.origen || ''));
-  return m ? Number(m[1]) : Infinity;
-}
-
 /**
  * ¿"Retomar el" deja fuera de las sugeridas a esta tarea? Solo si la fecha es
  * futura y no hay una fecha límite que llegue antes: retomar después no puede
@@ -186,23 +185,17 @@ export function estaPospuesta(t, hoyISO) {
 }
 
 /**
- * Tareas sugeridas para empezar (bloque 1-A): las abiertas con mayor orden
- * sugerido. No entran las concluidas, las que no tienen orden, las pospuestas
- * con "retomar el" ni las que ya se muestran en otra parte (`yaVisibles`).
- * Con el mismo orden, va primero la de menor número en la carga.
+ * Tareas sugeridas para empezar (bloques 1-A y 3-A): las abiertas de mayor
+ * orden. El orden se calcula aquí con la fecha del día (puntaje.mjs); no se
+ * usa el número guardado. No entran las concluidas, las que no tienen ningún
+ * impacto calificado, las pospuestas con "retomar el" ni las que ya se
+ * muestran en otra parte (`yaVisibles`). Con el mismo orden, la más antigua.
  */
-export function sugeridas(tareas, hoyISO, cuantas = 5, yaVisibles = []) {
+export function sugeridas(tareas, hoyISO, cuantas = SUGERIDAS_EN_HOY, yaVisibles = []) {
   const fuera = new Set((yaVisibles || []).map((t) => t.id));
-  const orden = (t) => (t.orden_sugerido === null || t.orden_sugerido === undefined || t.orden_sugerido === '' ? NaN : Number(t.orden_sugerido));
   return (tareas || [])
-    .filter((t) => t.type === 'Tarea' && !estaHecha(t) && Number.isFinite(orden(t)) && !fuera.has(t.id) && !estaPospuesta(t, hoyISO))
-    .sort((x, y) => {
-      if (orden(y) !== orden(x)) return orden(y) - orden(x);
-      const nx = numeroDeOrigen(x);
-      const ny = numeroDeOrigen(y);
-      if (nx !== ny) return nx < ny ? -1 : 1;
-      return String(x.title || '').localeCompare(String(y.title || ''));
-    })
+    .filter((t) => t.type === 'Tarea' && !estaHecha(t) && estaCalificada(t) && !fuera.has(t.id) && !estaPospuesta(t, hoyISO))
+    .sort(compararPorOrden(hoyISO))
     .slice(0, cuantas);
 }
 

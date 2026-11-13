@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import Icono from '../componentes/Icono';
 import { Hoja } from '../componentes/Armazon';
+import CamposPrioridad from '../componentes/CamposPrioridad';
 import { guardarCompromiso } from '../datos/compromisos';
 import { fechaLocalISO } from '../logica/agenda.mjs';
+import { explicarPuntaje } from '../logica/puntaje.mjs';
+import { tareaConPrioridad } from '../logica/prioridad.mjs';
 import {
   TIPOS, REPETICIONES, IMPORTANCIAS, CANALES, HORAS, MINUTOS,
   formularioDelDia, armarCompromiso, formularioInterpretado, mensajeDeRespuesta, esDudoso, lineasDe, llevaFechaHora,
@@ -52,6 +55,9 @@ export default function Capturar({ categorias, fechaInicial, alGuardar, alCerrar
   const esTarea = f.tipo === 'Tarea';
   const dividida = esTarea && f.tendraSubtareas;
   const conFecha = llevaFechaHora(f);
+
+  // Puntaje de la tarea con lo que hay en pantalla, para que se vea al calificar.
+  const puntaje = esTarea ? explicarPuntaje(tareaConPrioridad({}, { ...f.prioridad, fechaLimite: f.tieneFechaLimite ? f.fechaLimite : '' }), fechaLocalISO()) : null;
 
   // Manda el texto (dictado o escrito) a la función de IA y, con la respuesta,
   // llena el formulario para que el usuario revise y confirme.
@@ -331,7 +337,7 @@ export default function Capturar({ categorias, fechaInicial, alGuardar, alCerrar
       </div>
 
       <button type="button" className="ag-mas" aria-expanded={masOpciones} onClick={() => setMasOpciones(!masOpciones)}>
-        {masOpciones ? 'Menos opciones' : esTarea ? 'Más opciones: fecha límite, subtareas, notas' : f.tipo === 'Reunión' ? 'Más opciones: lugar, participantes, notas' : 'Más opciones: notas'}
+        {masOpciones ? 'Menos opciones' : esTarea ? 'Más opciones: fecha límite, prioridad, subtareas, notas' : f.tipo === 'Reunión' ? 'Más opciones: lugar, participantes, notas' : 'Más opciones: notas'}
       </button>
 
       {masOpciones && (
@@ -359,6 +365,11 @@ export default function Capturar({ categorias, fechaInicial, alGuardar, alCerrar
                   <input className="ag-campo" type="date" aria-label="Fecha límite" value={f.fechaLimite} onChange={(e) => poner({ fechaLimite: e.target.value })} />
                 </Opcion>
               )}
+              <div className="ag-prioridad">
+                <span className="ag-etq">Prioridad (opcional)</span>
+                <CamposPrioridad valores={f.prioridad} alCambiar={(cambios) => poner({ prioridad: { ...f.prioridad, ...cambios } })} />
+                <p className="ag-ayuda">{puntaje && puntaje.puntaje !== null ? 'Puntaje: ' + puntaje.puntaje + '. ' + puntaje.texto + '.' : 'Sin puntaje todavía: califica al menos un impacto para que entre a las sugeridas.'}</p>
+              </div>
               <Opcion icono="repetir" etiqueta="Reagendar si no la termino">
                 <Interruptor activo={f.requiereConfirmacion} alCambiar={(v) => poner({ requiereConfirmacion: v })} etiqueta="Reagendar si no la marco como terminada" />
               </Opcion>
@@ -430,6 +441,17 @@ export default function Capturar({ categorias, fechaInicial, alGuardar, alCerrar
       {mensaje && (
         <p className="ag-nota alerta" role="alert">
           {mensaje}
+        </p>
+      )}
+      {puntaje && (
+        <p className="ag-puntaje-vivo" role="status">
+          {puntaje.puntaje !== null ? (
+            <>
+              Puntaje de esta tarea: <strong>{puntaje.puntaje}</strong>
+            </>
+          ) : (
+            'Puntaje: aún sin calificar (en "Más opciones", Prioridad)'
+          )}
         </p>
       )}
       <button type="button" className="ag-boton principal" onClick={crear} disabled={guardando}>

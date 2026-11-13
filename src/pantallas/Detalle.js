@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import Icono from '../componentes/Icono';
 import { Hoja } from '../componentes/Armazon';
+import CamposPrioridad from '../componentes/CamposPrioridad';
 import {
   actualizarCompromiso, borrarCompromiso, alternarHecho, agregarSubtareas, alternarSubtarea, borrarSubtarea, intercambiarSubtareas,
 } from '../datos/compromisos';
 import { diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, nivelImportancia, partesDia } from '../logica/agenda.mjs';
 import { IMPORTANCIAS, HORAS, MINUTOS, lineasDe } from '../logica/compromiso.mjs';
 import { edicionDe, armarActualizacion, minutosValidos, vecinaDe, DELEGABLES, admitePrioridad, edicionPrioridad, cambiosPrioridad, datosDePrioridad } from '../logica/detalle.mjs';
+import { tareaConPrioridad } from '../logica/prioridad.mjs';
 import { anotarAccion } from '../datos/anotarAccion';
 import { ACCIONES } from '../logica/auditoria.mjs';
 
@@ -25,10 +27,11 @@ function Opcion({ icono, etiqueta, children }) {
 // tarea, se marcan, agregan, ordenan y borran sus subtareas.
 export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar, alCambiar, alAvisar }) {
   const [e, setE] = useState(() => edicionDe(tarea));
-  // Prioridad (bloque 1-A): solo en tareas y solo si la base ya trae esas columnas.
+  // Prioridad (bloques 1-A y 3-A): solo en tareas y solo si la base ya trae esas columnas.
   const conPrioridad = tarea.type === 'Tarea' && admitePrioridad(tarea);
   const [pr, setPr] = useState(() => edicionPrioridad(tarea));
-  const prioridad = conPrioridad ? datosDePrioridad(tarea) : [];
+  // El puntaje se calcula con lo que hay en pantalla, antes de guardar.
+  const prioridad = conPrioridad ? datosDePrioridad(tareaConPrioridad(tarea, pr), hoyISO) : [];
   const [mensaje, setMensaje] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [nuevaSubtarea, setNuevaSubtarea] = useState('');
@@ -79,7 +82,7 @@ export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar
 
   const guardar = () =>
     ejecutar(
-      () => actualizarCompromiso(supabase, tarea.id, conPrioridad ? { ...armarActualizacion(tarea, e), ...cambiosPrioridad(pr) } : armarActualizacion(tarea, e)),
+      () => actualizarCompromiso(supabase, tarea.id, conPrioridad ? { ...armarActualizacion(tarea, e), ...cambiosPrioridad(pr, tarea, hoyISO) } : armarActualizacion(tarea, e)),
       () => {
         alAvisar('Cambios guardados');
         alCerrar();
@@ -331,6 +334,7 @@ export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar
               ))}
             </dl>
           )}
+          <CamposPrioridad valores={pr} alCambiar={(cambios) => setPr((previo) => ({ ...previo, ...cambios }))} conFechaLimite />
           <div className="ag-opciones">
             <Opcion icono="hoy" etiqueta="Retomar el">
               <input className="ag-campo" type="date" aria-label="Retomar el" value={pr.retomarEl} onChange={(ev) => setPr({ ...pr, retomarEl: ev.target.value })} />
