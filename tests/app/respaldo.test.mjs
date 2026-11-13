@@ -71,7 +71,7 @@ describe('archivo de respaldo', () => {
     assert.equal(r.creado, '2026-11-11T18:00:00.000Z');
     assert.equal(r.app, 'I-2');
     assert.equal(r.base, 'produccion');
-    assert.deepEqual(r.esquema, ['20261111_esquema_base', '20261103_ai_usage']);
+    assert.deepEqual(r.esquema, ['20261111_esquema_base', '20261103_ai_usage', '20261113_prioridad']);
     assert.deepEqual(r.cantidades, { projects: 2, tasks: 2, subtasks: 2 });
     assert.deepEqual(r.datos, datosDe());
     for (const tabla of TABLAS) assert.match(r.huellas[tabla], /^[0-9a-f]{64}$/);

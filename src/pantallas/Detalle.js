@@ -7,7 +7,7 @@ import {
 } from '../datos/compromisos';
 import { diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, nivelImportancia, partesDia } from '../logica/agenda.mjs';
 import { IMPORTANCIAS, HORAS, MINUTOS, lineasDe } from '../logica/compromiso.mjs';
-import { edicionDe, armarActualizacion, minutosValidos, vecinaDe } from '../logica/detalle.mjs';
+import { edicionDe, armarActualizacion, minutosValidos, vecinaDe, DELEGABLES, admitePrioridad, edicionPrioridad, cambiosPrioridad, datosDePrioridad } from '../logica/detalle.mjs';
 import { anotarAccion } from '../datos/anotarAccion';
 import { ACCIONES } from '../logica/auditoria.mjs';
 
@@ -25,6 +25,10 @@ function Opcion({ icono, etiqueta, children }) {
 // tarea, se marcan, agregan, ordenan y borran sus subtareas.
 export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar, alCambiar, alAvisar }) {
   const [e, setE] = useState(() => edicionDe(tarea));
+  // Prioridad (bloque 1-A): solo en tareas y solo si la base ya trae esas columnas.
+  const conPrioridad = tarea.type === 'Tarea' && admitePrioridad(tarea);
+  const [pr, setPr] = useState(() => edicionPrioridad(tarea));
+  const prioridad = conPrioridad ? datosDePrioridad(tarea) : [];
   const [mensaje, setMensaje] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [nuevaSubtarea, setNuevaSubtarea] = useState('');
@@ -75,7 +79,7 @@ export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar
 
   const guardar = () =>
     ejecutar(
-      () => actualizarCompromiso(supabase, tarea.id, armarActualizacion(tarea, e)),
+      () => actualizarCompromiso(supabase, tarea.id, conPrioridad ? { ...armarActualizacion(tarea, e), ...cambiosPrioridad(pr) } : armarActualizacion(tarea, e)),
       () => {
         alAvisar('Cambios guardados');
         alCerrar();
@@ -313,6 +317,38 @@ export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar
         )}
       </div>
       {esTarea && subs.length > 0 && <p className="ag-ayuda">El tiempo de la tarea es la suma de sus subtareas: {minutosTotales} min.</p>}
+
+      {conPrioridad && (
+        <section className="ag-prioridad" aria-label="Prioridad">
+          <span className="ag-etq">Prioridad</span>
+          {prioridad.length > 0 && (
+            <dl className="ag-prioridad-datos">
+              {prioridad.map((d) => (
+                <div key={d.nombre}>
+                  <dt>{d.nombre}</dt>
+                  <dd>{d.valor}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          <div className="ag-opciones">
+            <Opcion icono="hoy" etiqueta="Retomar el">
+              <input className="ag-campo" type="date" aria-label="Retomar el" value={pr.retomarEl} onChange={(ev) => setPr({ ...pr, retomarEl: ev.target.value })} />
+            </Opcion>
+            <Opcion icono="personas" etiqueta="Delegable">
+              <select className="ag-campo" aria-label="Delegable" value={pr.delegable} onChange={(ev) => setPr({ ...pr, delegable: ev.target.value })}>
+                <option value="">Sin definir</option>
+                {DELEGABLES.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </Opcion>
+          </div>
+          <p className="ag-ayuda">Con una fecha en "Retomar el", la tarea no aparece entre las sugeridas hasta ese día, salvo que su fecha límite llegue antes.</p>
+        </section>
+      )}
 
       <label className="ag-etq" htmlFor="detalle-notas">
         {tarea.type === 'Reunión' ? 'Comentarios o lo que se trató' : 'Notas'}

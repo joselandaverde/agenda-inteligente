@@ -10,3 +10,10 @@ build/
 *.sql.real
 carga_tareas_excel.sql
 respaldos/
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+# Textos de la carga inicial (bloque 1-A): llevan datos reales
+1_carga.sql
+2_comprobar.sql
+3_deshacer.sql

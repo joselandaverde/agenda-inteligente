@@ -64,8 +64,10 @@ export default function Renglon({ tarea, subtareas, categoria, indiceCategoria, 
             <span className="ag-categoria">
               <i className={'ag-punto c' + (((indiceCategoria % 6) + 6) % 6)} />
               {categoria.name}
+              {tarea.grupo ? ' · ' + tarea.grupo : ''}
             </span>
           )}
+          {!categoria && tarea.grupo && <span className="ag-categoria">{tarea.grupo}</span>}
         </span>
       </button>
 

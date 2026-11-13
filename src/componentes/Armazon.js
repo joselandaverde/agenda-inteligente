@@ -67,6 +67,9 @@ export function EncabezadoDia({ grupo, hoyISO, extra }) {
   } else if (grupo.tipo === 'vencidos') {
     numero = 'Vencidos';
     alerta = true;
+  } else if (grupo.tipo === 'sugeridas') {
+    numero = 'Sugeridas';
+    nombre = 'por puntaje';
   } else if (grupo.tipo === 'sinFecha') {
     numero = 'Sin fecha';
   } else {

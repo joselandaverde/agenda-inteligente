@@ -10,7 +10,7 @@ import Respaldo, { AvisoRespaldo, leerMarcas, guardarMarca } from './pantallas/R
 import Semana from './pantallas/Semana';
 import { Encabezado, EncabezadoDia, BarraNavegacion, BotonDictar, TiraSemana, Vacio, usarComputadora } from './componentes/Armazon';
 import { alternarHecho } from './datos/compromisos';
-import { fechaLocalISO, fechaLarga, formatoDuracion, gruposDeHoy, gruposProximos, resumen } from './logica/agenda.mjs';
+import { fechaLocalISO, fechaLarga, formatoDuracion, gruposDeHoy, gruposProximos, resumen, sugeridas } from './logica/agenda.mjs';
 import { debeAvisar } from './logica/respaldo.mjs';
 
 // Armazón de la app: sesión, carga de datos y navegación. Cada pantalla vive
@@ -196,7 +196,11 @@ export default function App() {
     );
   }
 
-  const gruposHoy = gruposDeHoy(tareas, hoyISO);
+  const gruposDelDia = gruposDeHoy(tareas, hoyISO);
+  // Bloque 1-A: debajo de lo de hoy, las tareas de mayor orden sugerido que
+  // no estén ya en la lista.
+  const tareasSugeridas = sugeridas(tareas, hoyISO, 5, gruposDelDia.flatMap((g) => g.tareas));
+  const gruposHoy = tareasSugeridas.length > 0 ? [...gruposDelDia, { clave: 'sugeridas', tipo: 'sugeridas', tareas: tareasSugeridas }] : gruposDelDia;
   const proximos = gruposProximos(tareas, hoyISO);
   const gruposVisibles = pantalla === 'hoy' ? gruposHoy : proximos;
   const resumenHoy = resumen((gruposHoy.find((g) => g.clave === hoyISO) || { tareas: [] }).tareas, subtareasDe);

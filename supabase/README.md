@@ -8,6 +8,7 @@ El esquema de la app vive aquí como migraciones SQL. Una base nueva se crea
 | 1 | `migrations/20261111_esquema_base.sql` | Tablas `projects`, `tasks` y `subtasks`, con seguridad por fila |
 | 2 | `migrations/20261103_ai_usage.sql` | Tabla `ai_usage` y función `ai_check_and_increment` (límite de uso de la IA) |
 | 3 | `migrations/20261112_audit_log.sql` | Tabla `audit_log`: registro de acciones delicadas, que el usuario puede leer y ampliar pero no alterar |
+| 4 | `migrations/20261113_prioridad.sql` | Columnas de prioridad en `tasks` (impactos, urgencia, esfuerzo, delegable, retomar el, grupo, puntaje, orden sugerido) y datos de la carga inicial (`origen`, `lote_carga`) |
 
 Los archivos son independientes entre sí e idempotentes.
 
@@ -27,6 +28,13 @@ Los archivos son independientes entre sí e idempotentes.
 |---|---|---|
 | Producción | Proyecto nuevo (bloque 0-B) | Creado solo con estas migraciones |
 | Pruebas | Proyecto original | Esquema anterior a las migraciones; conserva políticas duplicadas y cinco tablas sin uso, que se revisan en el bloque 0-D |
+
+## Carga inicial de tareas
+
+`herramientas/generar_carga.py` lee el Excel de priorización y escribe, fuera del
+repositorio, el texto de carga, el de comprobación y el de deshacer. Los archivos
+que genera contienen datos reales y nunca se versionan. `probar_generar_carga.py`
+lo prueba con un Excel inventado.
 
 ## Pruebas de permisos
 
