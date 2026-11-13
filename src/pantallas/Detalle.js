@@ -6,10 +6,14 @@ import CamposPrioridad from '../componentes/CamposPrioridad';
 import {
   actualizarCompromiso, borrarCompromiso, alternarHecho, agregarSubtareas, alternarSubtarea, borrarSubtarea, intercambiarSubtareas,
 } from '../datos/compromisos';
-import { diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, nivelImportancia, partesDia } from '../logica/agenda.mjs';
+import { diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, nivelImportancia, partesDia, textoDeDelegada } from '../logica/agenda.mjs';
 import { IMPORTANCIAS, HORAS, MINUTOS, lineasDe } from '../logica/compromiso.mjs';
 import { edicionDe, armarActualizacion, minutosValidos, vecinaDe, DELEGABLES, admitePrioridad, edicionPrioridad, cambiosPrioridad, datosDePrioridad } from '../logica/detalle.mjs';
 import { tareaConPrioridad } from '../logica/prioridad.mjs';
+import {
+  LEYENDA_INCOMPLETA, AYUDA_INCOMPLETA, admiteDelegacion, estaDelegada, estaIncompleta, validarDelegacion, cambioDeRevision,
+  cambiosDeRetomar, cambiosDeEntregada, revisionPropuesta,
+} from '../logica/seguimiento.mjs';
 import { anotarAccion } from '../datos/anotarAccion';
 import { ACCIONES } from '../logica/auditoria.mjs';
 
@@ -25,7 +29,7 @@ function Opcion({ icono, etiqueta, children }) {
 
 // Pantalla de un compromiso: se ve completo, se editan sus datos y, si es una
 // tarea, se marcan, agregan, ordenan y borran sus subtareas.
-export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar, alCambiar, alAvisar }) {
+export default function Detalle({ tarea, subtareas, categorias, delegados = [], hoyISO, alCerrar, alCambiar, alAvisar }) {
   const [e, setE] = useState(() => edicionDe(tarea));
   // Prioridad (bloques 1-A y 3-A): solo en tareas y solo si la base ya trae esas columnas.
   const conPrioridad = tarea.type === 'Tarea' && admitePrioridad(tarea);
@@ -39,6 +43,12 @@ export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar
   const [pegarLista, setPegarLista] = useState(false);
   const [textoLista, setTextoLista] = useState('');
   const [tiempoLista, setTiempoLista] = useState('30');
+  // Delegación (bloque 3-A2)
+  const [delegando, setDelegando] = useState(false);
+  const [aQuien, setAQuien] = useState('');
+  const [revisarEl, setRevisarEl] = useState(() => revisionPropuesta(hoyISO));
+  const [otroDia, setOtroDia] = useState(false);
+  const [nuevaRevision, setNuevaRevision] = useState('');
 
   const poner = (cambios) => setE((previo) => ({ ...previo, ...cambios }));
   const esTarea = tarea.type === 'Tarea';
@@ -49,6 +59,12 @@ export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar
   const minutosTotales = minutosDe(tarea, subs);
   const avance = subs.length > 0 ? Math.round((hechas.length / subs.length) * 100) : 0;
   const categoria = categorias.find((c) => c.id === tarea.project_id) || null;
+
+  // Esfuerzo Grande sin su plan de subtareas: se puede guardar, pero queda incompleta.
+  const incompleta = estaIncompleta({ ...tarea, esfuerzo: conPrioridad ? pr.esfuerzo : tarea.esfuerzo }, subs.length);
+  // Delegación: solo en tareas abiertas y si la base ya trae las columnas.
+  const conDelegacion = esTarea && !hecha && admiteDelegacion(tarea);
+  const delegada = estaDelegada(tarea);
 
   // Línea de cuándo: fecha y hora, y para las tareas su fecha límite.
   const cuando = [];
@@ -90,6 +106,47 @@ export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar
     );
 
   const marcar = () => ejecutar(() => alternarHecho(supabase, tarea));
+
+  function delegar() {
+    const r = validarDelegacion({ aQuien, revisarEl }, hoyISO);
+    if (r.error) {
+      setMensaje(r.error);
+      return;
+    }
+    ejecutar(
+      () => actualizarCompromiso(supabase, tarea.id, r.cambios),
+      () => {
+        alAvisar('Delegada a ' + r.cambios.delegada_a);
+        alCerrar();
+      }
+    );
+  }
+
+  function cambiarRevision() {
+    const r = cambioDeRevision(nuevaRevision, hoyISO);
+    if (r.error) {
+      setMensaje(r.error);
+      return;
+    }
+    ejecutar(
+      () => actualizarCompromiso(supabase, tarea.id, r.cambios),
+      () => {
+        alAvisar('Nueva fecha de revisión guardada');
+        setOtroDia(false);
+      }
+    );
+  }
+
+  const retomar = () => ejecutar(() => actualizarCompromiso(supabase, tarea.id, cambiosDeRetomar()), () => alAvisar('La tarea vuelve a ser tuya'));
+
+  const entregada = () =>
+    ejecutar(
+      () => actualizarCompromiso(supabase, tarea.id, cambiosDeEntregada(new Date().toISOString())),
+      () => {
+        alAvisar('Marcada como entregada');
+        alCerrar();
+      }
+    );
 
   function borrar() {
     const ok = window.confirm('¿Borrar "' + tarea.title + '"? Esta acción no se puede deshacer.');
@@ -193,6 +250,12 @@ export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar
             </li>
           ))}
         </ul>
+      )}
+
+      {incompleta && (
+        <p className="ag-nota alerta" role="status">
+          <strong>{LEYENDA_INCOMPLETA}.</strong> {AYUDA_INCOMPLETA}
+        </p>
       )}
 
       {esTarea && (
@@ -351,6 +414,69 @@ export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar
             </Opcion>
           </div>
           <p className="ag-ayuda">Con una fecha en "Retomar el", la tarea no aparece entre las sugeridas hasta ese día, salvo que su fecha límite llegue antes.</p>
+        </section>
+      )}
+
+      {conDelegacion && (
+        <section className="ag-delegacion" aria-label="Delegación">
+          <span className="ag-etq">Delegación</span>
+          {!delegada && !delegando && (
+            <>
+              {conPrioridad && pr.delegable === 'Delegable' && <p className="ag-ayuda">Se puede delegar: decide a quién.</p>}
+              <button type="button" className="ag-boton-secundario ancho" onClick={() => setDelegando(true)} disabled={ocupado}>
+                Delegar esta tarea
+              </button>
+            </>
+          )}
+          {!delegada && delegando && (
+            <>
+              <label className="ag-etq" htmlFor="delegar-a">
+                ¿A quién se la delegas?
+              </label>
+              <input id="delegar-a" className="ag-campo ancho" type="text" list="delegar-nombres" maxLength={80} value={aQuien} onChange={(ev) => setAQuien(ev.target.value)} placeholder="Nombre" />
+              <datalist id="delegar-nombres">
+                {delegados.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
+              <label className="ag-etq" htmlFor="delegar-revision">
+                ¿Cuándo revisas cómo va?
+              </label>
+              <input id="delegar-revision" className="ag-campo" type="date" value={revisarEl} onChange={(ev) => setRevisarEl(ev.target.value)} />
+              <p className="ag-ayuda">Desde ese día te aparece en Seguimiento. Mientras tanto no compite por tu tiempo ni se sugiere.</p>
+              <div className="ag-subtarea-nueva">
+                <button type="button" className="ag-boton-secundario" onClick={delegar} disabled={ocupado}>
+                  Confirmar
+                </button>
+                <button type="button" className="ag-boton-secundario" onClick={() => setDelegando(false)} disabled={ocupado}>
+                  Cancelar
+                </button>
+              </div>
+            </>
+          )}
+          {delegada && (
+            <>
+              <p className="ag-delegada-texto">{textoDeDelegada(tarea, hoyISO)}</p>
+              <button type="button" className="ag-boton-secundario ancho" onClick={entregada} disabled={ocupado}>
+                Ya la entregaron
+              </button>
+              {!otroDia ? (
+                <button type="button" className="ag-boton-secundario ancho" onClick={() => { setNuevaRevision(revisionPropuesta(hoyISO)); setOtroDia(true); }} disabled={ocupado}>
+                  Revisar otro día
+                </button>
+              ) : (
+                <div className="ag-subtarea-nueva">
+                  <input className="ag-campo" type="date" aria-label="Nueva fecha de revisión" value={nuevaRevision} onChange={(ev) => setNuevaRevision(ev.target.value)} />
+                  <button type="button" className="ag-boton-secundario" onClick={cambiarRevision} disabled={ocupado}>
+                    Guardar
+                  </button>
+                </div>
+              )}
+              <button type="button" className="ag-boton-secundario ancho" onClick={retomar} disabled={ocupado}>
+                Retomarla yo
+              </button>
+            </>
+          )}
         </section>
       )}
 

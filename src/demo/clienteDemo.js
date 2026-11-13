@@ -17,7 +17,7 @@ function datosIniciales() {
     { id: 'cat-3', user_id: usuario, name: 'Casa', priority_order: 3, context: null },
   ];
 
-  const sinPrioridad = { impact_generar: null, impact_proteger: null, impact_politico: null, impact_personal: null, urgency_category: null, esfuerzo: null, delegable: null, me_esperan: null, retomar_el: null, grupo: null, puntaje: null, orden_sugerido: null, origen: null, lote_carga: null };
+  const sinPrioridad = { impact_generar: null, impact_proteger: null, impact_politico: null, impact_personal: null, urgency_category: null, esfuerzo: null, delegable: null, me_esperan: null, retomar_el: null, grupo: null, puntaje: null, orden_sugerido: null, origen: null, lote_carga: null, delegada_a: null, delegada_el: null, revisar_el: null };
   const base = { user_id: usuario, state: 'Pendiente', priority: 'Media', repetition: 'Ninguna', project_id: null, date_promised: null, deadline: null, notes: null, location: null, time_estimated: 30, ...sinPrioridad };
   // Como las que entran en la carga inicial (bloque 1-A): con impactos y grupo. El puntaje que
   // se ve lo calcula la app con la fecha del día (bloque 3-A); estas columnas son solo referencia.
@@ -42,16 +42,26 @@ function datosIniciales() {
     cargada(5, 25, { title: 'Cotizar impermeabilización', project_id: 'cat-3', grupo: 'Mantenimiento', esfuerzo: 'Medio' }),
     cargada(6, 25, { title: 'Ordenar la bodega', project_id: 'cat-3', grupo: 'Mantenimiento', ...sinImpactos, puntaje: null, orden_sugerido: null }),
     cargada(7, 12.5, { title: 'Renovar suscripciones', grupo: 'Orden', ...sinImpactos, puntaje: null, orden_sugerido: null }),
+    // Bloque 3-A2: un proyecto grande sin plan (incompleta), uno con plan (se sugiere su siguiente subtarea)
+    // y dos tareas delegadas con seguimiento.
+    { ...base, id: 't-g1', title: 'Proyecto: rediseñar la cobranza', type: 'Tarea', time_estimated: null, impact_generar: 2, impact_proteger: 2, impact_politico: 1, impact_personal: 0, esfuerzo: 'Grande', project_id: 'cat-1' },
+    { ...base, id: 't-g2', title: 'Proyecto: migrar la contabilidad', type: 'Tarea', time_estimated: null, impact_generar: 2, impact_proteger: 2, impact_politico: 2, impact_personal: 0, esfuerzo: 'Grande', project_id: 'cat-1' },
+    { ...base, id: 't-d1', title: 'Cotizar equipo de cómputo', type: 'Tarea', impact_generar: 1, impact_proteger: 1, impact_politico: 0, impact_personal: 0, delegable: 'Delegable', delegada_a: 'Ana', delegada_el: dia(-3), revisar_el: dia(0), project_id: 'cat-2' },
+    { ...base, id: 't-d2', title: 'Revisar contrato con el proveedor', type: 'Tarea', impact_generar: 1, impact_proteger: 2, impact_politico: 0, impact_personal: 0, delegable: 'Delegable', delegada_a: 'Luis', delegada_el: dia(-1), revisar_el: dia(3), project_id: 'cat-2' },
     { ...base, id: 't-12', title: 'Cotizar seguro del auto', type: 'Tarea', state: 'Hecho', date_promised: momento(-3, '11:00'), date_completed: momento(-3, '12:00'), time_estimated: 30 },
   ];
 
-  const sub = (id, orden, title, min, hecho) => ({ id, user_id: usuario, task_id: 't-2', title, time_estimated: min, state: hecho ? 'Hecho' : 'Pendiente', orden });
+  const sub = (id, orden, title, min, hecho, tareaId = 't-2') => ({ id, user_id: usuario, task_id: tareaId, title, time_estimated: min, state: hecho ? 'Hecho' : 'Pendiente', orden });
   const subtasks = [
     sub('s-1', 1, 'Bajar estados de cuenta', 30, true),
     sub('s-2', 2, 'Conciliar bancos', 45, true),
     sub('s-3', 3, 'Capturar gastos', 30, false),
     sub('s-4', 4, 'Revisar con el contador', 30, false),
     sub('s-5', 5, 'Enviar', 15, false),
+    sub('s-6', 1, 'Levantar los saldos de cada sistema', 60, true, 't-g2'),
+    sub('s-7', 2, 'Elegir el nuevo catálogo de cuentas', 90, false, 't-g2'),
+    sub('s-8', 3, 'Migrar un mes de prueba', 120, false, 't-g2'),
+    sub('s-9', 4, 'Cerrar y comparar con el sistema anterior', 120, false, 't-g2'),
   ];
 
   return { projects, tasks, subtasks, audit_log: [] };

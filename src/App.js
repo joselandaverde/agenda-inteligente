@@ -9,8 +9,9 @@ import Detalle from './pantallas/Detalle';
 import Respaldo, { AvisoRespaldo, leerMarcas, guardarMarca } from './pantallas/Respaldo';
 import Semana from './pantallas/Semana';
 import { Encabezado, EncabezadoDia, BarraNavegacion, BotonDictar, TiraSemana, Vacio, usarComputadora } from './componentes/Armazon';
-import { alternarHecho } from './datos/compromisos';
-import { SUGERIDAS_EN_HOY, fechaLocalISO, fechaLarga, formatoDuracion, gruposDeHoy, gruposProximos, resumen, sugeridas } from './logica/agenda.mjs';
+import { alternarHecho, alternarSubtarea } from './datos/compromisos';
+import { SUGERIDAS_EN_HOY, fechaLocalISO, fechaLarga, formatoDuracion, gruposDeHoy, gruposProximos, minutosPendientesDe, resumen, sugeridasConPasos } from './logica/agenda.mjs';
+import { delegadosConocidos } from './logica/seguimiento.mjs';
 import { debeAvisar } from './logica/respaldo.mjs';
 
 // Armazón de la app: sesión, carga de datos y navegación. Cada pantalla vive
@@ -96,6 +97,12 @@ export default function App() {
     if (!error) cargarTareas();
   }
 
+  // Marcar como hecho el paso (la subtarea) que se sugiere de una tarea
+  async function alternarPaso(sub) {
+    const { error } = await alternarSubtarea(supabase, sub);
+    if (!error) cargarSubtareas();
+  }
+
   async function salir() {
     await supabase.auth.signOut();
   }
@@ -158,6 +165,7 @@ export default function App() {
           tarea={tareaAbierta}
           subtareas={subtareasDe(tareaAbierta.id)}
           categorias={categorias}
+          delegados={delegadosConocidos(tareas)}
           hoyISO={hoyISO}
           alCerrar={() => setDetalleId(null)}
           alCambiar={() => {
@@ -187,6 +195,7 @@ export default function App() {
           respaldo={{ mostrar: avisarRespaldo, ultimo: marcas.ultimo, alPosponer: () => marcarRespaldo('pospuesto') }}
           administracion={administracion}
           alMarcar={alternarConcluida}
+          alMarcarPaso={alternarPaso}
           alAbrir={(t) => setDetalleId(t.id)}
           alCapturar={(fecha) => setCaptura({ fecha })}
           alSalir={salir}
@@ -198,9 +207,10 @@ export default function App() {
 
   const gruposDelDia = gruposDeHoy(tareas, hoyISO);
   // Debajo de lo de hoy, las cuatro tareas de mayor puntaje (calculado con la
-  // fecha del día) que no estén ya en la lista.
-  const tareasSugeridas = sugeridas(tareas, hoyISO, SUGERIDAS_EN_HOY, gruposDelDia.flatMap((g) => g.tareas));
-  const gruposHoy = tareasSugeridas.length > 0 ? [...gruposDelDia, { clave: 'sugeridas', tipo: 'sugeridas', tareas: tareasSugeridas }] : gruposDelDia;
+  // fecha del día) que no estén ya en la lista; una tarea dividida en subtareas
+  // se sugiere por su siguiente subtarea.
+  const sugerencia = sugeridasConPasos(tareas, hoyISO, SUGERIDAS_EN_HOY, gruposDelDia.flatMap((g) => g.tareas), subtareasDe);
+  const gruposHoy = sugerencia.tareas.length > 0 ? [...gruposDelDia, { clave: 'sugeridas', tipo: 'sugeridas', tareas: sugerencia.tareas, pasos: sugerencia.pasos }] : gruposDelDia;
   const proximos = gruposProximos(tareas, hoyISO);
   const gruposVisibles = pantalla === 'hoy' ? gruposHoy : proximos;
   const resumenHoy = resumen((gruposHoy.find((g) => g.clave === hoyISO) || { tareas: [] }).tareas, subtareasDe);
@@ -267,7 +277,7 @@ export default function App() {
           )}
           {gruposVisibles.map((g) => (
             <section key={g.clave} id={'grupo-' + g.clave} className="ag-grupo">
-              <EncabezadoDia grupo={g} hoyISO={hoyISO} extra={formatoDuracion(resumen(g.tareas.filter((x) => x.state !== 'Hecho'), subtareasDe).totalMin)} />
+              <EncabezadoDia grupo={g} hoyISO={hoyISO} extra={formatoDuracion(minutosPendientesDe(g, subtareasDe))} />
               {g.tareas.map((t) => (
                 <div key={t.id} className="ag-item">
                   <Renglon
@@ -279,6 +289,8 @@ export default function App() {
                     hoyISO={hoyISO}
                     alMarcar={() => alternarConcluida(t)}
                     alAbrir={() => setDetalleId(t.id)}
+                    paso={g.pasos ? g.pasos.get(t.id) : undefined}
+                    alMarcarPaso={() => g.pasos && g.pasos.get(t.id) && alternarPaso(g.pasos.get(t.id))}
                   />
                 </div>
               ))}
