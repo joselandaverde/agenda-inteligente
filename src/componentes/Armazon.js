@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import Icono from './Icono';
 import { partesDia } from '../logica/agenda.mjs';
+import { semanaDe } from '../logica/detalle.mjs';
 
 // Piezas del armazón de la app: encabezado de pantalla, encabezado de cada
 // grupo de la lista, barra inferior, botón de dictado, hoja y estado vacío.
@@ -51,6 +52,32 @@ export function EncabezadoDia({ grupo, hoyISO, extra }) {
       {nombre && <span className="ag-grupo-nombre">{nombre}</span>}
       {extra && <span className="ag-grupo-extra">{extra}</span>}
     </h2>
+  );
+}
+
+// Los siete dias de la semana en curso. Los que tienen algo llevan un punto
+// y, al tocarlos, la lista salta a ese dia.
+export function TiraSemana({ hoyISO, diasConAlgo, alElegir }) {
+  return (
+    <div className="ag-semana" role="group" aria-label="Días de esta semana">
+      {semanaDe(hoyISO).map((d) => {
+        const conAlgo = diasConAlgo.has(d.iso);
+        return (
+          <button
+            key={d.iso}
+            type="button"
+            className={(d.esHoy ? 'hoy' : '') + (d.pasado ? ' pasado' : '')}
+            onClick={() => alElegir(d.iso)}
+            disabled={!conAlgo}
+            aria-label={'Día ' + d.numero + (d.esHoy ? ', hoy' : '') + (conAlgo ? ', con compromisos' : ', sin compromisos')}
+          >
+            <span>{d.letra}</span>
+            <b>{d.numero}</b>
+            <i className={conAlgo ? 'punto' : ''} />
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
