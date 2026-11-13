@@ -16,7 +16,7 @@ export const CAMPOS_IMPACTO = [
   { clave: 'generar', columna: 'impact_generar', nombre: 'Ganar dinero', ayuda: 'Ingresos o ahorro (E+ en tu Excel)' },
   { clave: 'proteger', columna: 'impact_proteger', nombre: 'Evitar pérdidas', ayuda: 'Multas, riesgos o problemas que esto previene (E−)' },
   { clave: 'politico', columna: 'impact_politico', nombre: 'Imagen y relaciones', ayuda: 'Jefes, clientes, reputación, posición (P, Político)' },
-  { clave: 'personal', columna: 'impact_personal', nombre: 'Salud y familia', ayuda: 'Bienestar tuyo y de los tuyos (Personal)' },
+  { clave: 'personal', columna: 'impact_personal', nombre: 'Beneficio personal', ayuda: 'Salud, familia, bienestar (Personal)' },
 ];
 
 export { URGENCIAS, ESFUERZOS };
