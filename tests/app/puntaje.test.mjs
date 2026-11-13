@@ -6,6 +6,8 @@ import {
   PESOS, estaCalificada, baseDeImpacto, factorDeUrgencia, puntajeDe, ordenDe, referenciaDe, explicarPuntaje,
   diasParaElLimite, compararPorOrden,
 } from '../../src/logica/puntaje.mjs';
+import { sugeridas } from '../../src/logica/agenda.mjs';
+import { tareasAbiertas } from '../../src/logica/semana.mjs';
 
 const HOY = '2026-11-13';
 // Una tarea con los cuatro impactos [Generar, Proteger, Político, Personal].
@@ -277,5 +279,86 @@ describe('comparar por orden', () => {
     const lista = [t(1, [2, 2, 2, 0]), t(2, [1, 1, 1, 1], { deadline: '2026-12-31' })];
     assert.deepEqual([...lista].sort(compararPorOrden('2026-11-13')).map((x) => x.id), [1, 2]);
     assert.deepEqual([...lista].sort(compararPorOrden('2026-12-31')).map((x) => x.id), [2, 1]);
+  });
+});
+
+// Cada prueba de aquí es una fila de la tabla de "datos ausentes" del documento
+// docs/fase1/05_reglas_de_puntaje.md (A1 a A12). Si cambia una regla, cambia
+// la prueba y el documento.
+describe('reglas cuando faltan datos (documento 05, tabla A)', () => {
+  const base = [2, 1, null, null]; // 42.5 sin urgencia
+  const lista = (...tareas) => tareas.map((t, i) => ({ id: 'x' + i, title: 'T' + i, state: 'Pendiente', priority: 'Media', ...t, type: t.type || 'Tarea' }));
+
+  test('A1 ningún impacto lleno: sin puntaje, fuera de Sugeridas y después de las calificadas en Tareas', () => {
+    const sin = con(NO, { id: 'a', title: 'A', priority: 'Muy alta', state: 'Pendiente', urgency_category: 'Fecha dura', deadline: HOY, esfuerzo: 'Rápido', me_esperan: true });
+    const con1 = con([0, null, null, null], { id: 'b', title: 'B', priority: 'Baja', state: 'Pendiente' });
+    assert.equal(puntajeDe(sin, HOY), null);
+    assert.equal(ordenDe(sin, HOY), null);
+    assert.deepEqual(sugeridas([sin, con1], HOY).map((t) => t.id), ['b']);
+    assert.deepEqual(tareasAbiertas([sin, con1], HOY).map((t) => t.id), ['b', 'a']);
+  });
+
+  test('A2 algunos impactos vacíos: cuentan como 0', () => {
+    assert.equal(puntajeDe(con([2, 1, null, null]), HOY), 42.5);
+    assert.equal(puntajeDe(con([2, 1, 0, 0]), HOY), 42.5);
+    assert.equal(puntajeDe(con([2, 1, undefined, '']), HOY), 42.5);
+  });
+
+  test('A3 todos los impactos en 0: puntaje 0 (está calificada y entra al orden al final)', () => {
+    assert.equal(puntajeDe(con([0, 0, 0, 0]), HOY), 0);
+    assert.deepEqual(sugeridas(lista(con([0, 0, 0, 0], { id: 'z' }), con([1, 0, 0, 0], { id: 'y' })), HOY).map((t) => t.id), ['y', 'z']);
+  });
+
+  test('A4 sin urgencia y sin fecha límite: ×1.0', () => {
+    assert.equal(puntajeDe(con(base), HOY), 42.5);
+    assert.equal(puntajeDe(con(base, { urgency_category: null, deadline: null }), HOY), 42.5);
+  });
+
+  test('A5 urgencia vacía pero con fecha límite: manda la fecha', () => {
+    assert.equal(puntajeDe(con(base, { deadline: '2026-11-18' }), HOY), 63.8);
+  });
+
+  test('A6 fecha límite vacía o que no se entiende: vale la categoría, y si tampoco hay, ×1.0', () => {
+    assert.equal(puntajeDe(con(base, { deadline: '', urgency_category: 'Fecha dura' }), HOY), 63.8);
+    assert.equal(puntajeDe(con(base, { deadline: 'pronto', urgency_category: 'Ventana' }), HOY), 51);
+    assert.equal(puntajeDe(con(base, { deadline: 'pronto' }), HOY), 42.5);
+  });
+
+  test('A7 sin esfuerzo, o con uno fuera de catálogo: sin desempate', () => {
+    assert.equal(ordenDe(con(base), HOY), 42.5);
+    assert.equal(ordenDe(con(base, { esfuerzo: null }), HOY), 42.5);
+    assert.equal(ordenDe(con(base, { esfuerzo: 'Enorme' }), HOY), 42.5);
+  });
+
+  test('A8 "¿te esperan?" vacío o en No: sin desempate', () => {
+    assert.equal(ordenDe(con(base, { me_esperan: null }), HOY), 42.5);
+    assert.equal(ordenDe(con(base, { me_esperan: false }), HOY), 42.5);
+    assert.equal(ordenDe(con(base, { me_esperan: true }), HOY), 42.503);
+  });
+
+  test('A9 avance, delegable, retomar el y grupo no cambian el puntaje ni el orden', () => {
+    const t = con(base, { esfuerzo: 'Medio' });
+    const igual = { ...t, progress: 80, delegable: 'Delegable', retomar_el: '2026-12-01', grupo: 'Fiscal', priority: 'Muy baja' };
+    assert.equal(puntajeDe(igual, HOY), puntajeDe(t, HOY));
+    assert.equal(ordenDe(igual, HOY), ordenDe(t, HOY));
+  });
+
+  test('A10 solo las tareas se ordenan: reuniones y recordatorios no entran a Sugeridas ni a Tareas', () => {
+    const l = lista(con(base, { id: 'r', type: 'Reunión' }), con(base, { id: 'm', type: 'Recordatorio' }), con(base, { id: 't' }));
+    assert.deepEqual(sugeridas(l, HOY).map((t) => t.id), ['t']);
+    assert.deepEqual(tareasAbiertas(l, HOY).map((t) => t.id), ['t']);
+  });
+
+  test('A11 una tarea hecha no aparece en Sugeridas ni en Tareas, aunque tenga puntaje', () => {
+    const l = lista(con(base, { id: 'h', state: 'Hecho' }), con(base, { id: 'p' }));
+    assert.deepEqual(sugeridas(l, HOY).map((t) => t.id), ['p']);
+    assert.deepEqual(tareasAbiertas(l, HOY).map((t) => t.id), ['p']);
+  });
+
+  test('A12 la fecha de referencia es la que se le da (en la app, el día de hoy del equipo); sin fecha válida no hay días', () => {
+    assert.equal(diasParaElLimite({ deadline: '2026-11-18' }, HOY), 5);
+    assert.equal(diasParaElLimite({ deadline: '2026-11-18' }, ''), null);
+    // sin fecha de referencia válida, la fecha límite no cuenta: vale la categoría
+    assert.equal(puntajeDe(con(base, { deadline: '2026-11-18', urgency_category: 'Ventana' }), 'no es fecha'), 51);
   });
 });
