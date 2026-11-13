@@ -7,9 +7,10 @@ import { guardarCompromiso } from '../datos/compromisos';
 import { fechaLocalISO } from '../logica/agenda.mjs';
 import { explicarPuntaje } from '../logica/puntaje.mjs';
 import { tareaConPrioridad } from '../logica/prioridad.mjs';
+import { LEYENDA_INCOMPLETA, AYUDA_INCOMPLETA } from '../logica/seguimiento.mjs';
 import {
   TIPOS, REPETICIONES, IMPORTANCIAS, CANALES, HORAS, MINUTOS,
-  formularioDelDia, armarCompromiso, formularioInterpretado, mensajeDeRespuesta, esDudoso, lineasDe, llevaFechaHora,
+  formularioDelDia, armarCompromiso, formularioInterpretado, formularioIncompleto, mensajeDeRespuesta, esDudoso, lineasDe, llevaFechaHora,
 } from '../logica/compromiso.mjs';
 
 // Un renglón del formulario: ícono, nombre del dato y su control a la derecha.
@@ -173,7 +174,8 @@ export default function Capturar({ categorias, fechaInicial, alGuardar, alCerrar
       setMensaje('Error: ' + error.message);
       return;
     }
-    alGuardar(r.subtareas.length > 0 ? 'Tarea y ' + r.subtareas.length + ' subtarea(s) guardadas' : 'Compromiso guardado');
+    // Una tarea Grande sin su plan se guarda (para no perderla) y se avisa que quedó incompleta.
+    alGuardar(formularioIncompleto(f) ? 'Tarea guardada como incompleta: falta el plan de trabajo' : r.subtareas.length > 0 ? 'Tarea y ' + r.subtareas.length + ' subtarea(s) guardadas' : 'Compromiso guardado');
   }
 
   const hayAviso = dudosos.length > 0;
@@ -368,6 +370,11 @@ export default function Capturar({ categorias, fechaInicial, alGuardar, alCerrar
               <div className="ag-prioridad">
                 <span className="ag-etq">Prioridad (opcional)</span>
                 <CamposPrioridad valores={f.prioridad} alCambiar={(cambios) => poner({ prioridad: { ...f.prioridad, ...cambios } })} />
+                {formularioIncompleto(f) && (
+                  <p className="ag-nota alerta" role="status">
+                    <strong>{LEYENDA_INCOMPLETA}.</strong> {AYUDA_INCOMPLETA}
+                  </p>
+                )}
                 <p className="ag-ayuda">{puntaje && puntaje.puntaje !== null ? 'Puntaje: ' + puntaje.puntaje + '. ' + puntaje.texto + '.' : 'Sin puntaje todavía: califica al menos un impacto para que entre a las sugeridas.'}</p>
               </div>
               <Opcion icono="repetir" etiqueta="Reagendar si no la termino">

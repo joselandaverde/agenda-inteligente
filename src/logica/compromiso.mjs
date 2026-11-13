@@ -3,6 +3,7 @@
 
 import { fechaLocalISO } from './agenda.mjs';
 import { prioridadVacia, columnasParaCrear } from './prioridad.mjs';
+import { SUBTAREAS_MINIMAS } from './seguimiento.mjs';
 
 const dos = (n) => String(n).padStart(2, '0');
 
@@ -81,6 +82,31 @@ export function lineasDe(texto) {
     .filter((l) => l.length > 0);
 }
 
+/**
+ * Subtareas que tendría la tarea con lo que hay en el formulario: las ya
+ * agregadas, la que se está escribiendo y las de una lista pegada. Vacío si no
+ * se va a dividir.
+ */
+export function subtareasDelFormulario(f) {
+  if (!(f.tipo === 'Tarea' && f.tendraSubtareas)) return [];
+  const lista = [...(f.subtareas || [])];
+  if (String(f.nuevaSubtareaTitulo || '').trim()) {
+    lista.push({ titulo: f.nuevaSubtareaTitulo.trim(), tiempo: minutosOTreinta(f.nuevaSubtareaTiempo) });
+  }
+  const tiempoLista = minutosOTreinta(f.tiempoLista);
+  lista.push(...lineasDe(f.textoLista).map((l) => ({ titulo: l, tiempo: tiempoLista })));
+  return lista;
+}
+
+/**
+ * ¿Quedaría incompleta la tarea que se está capturando? Es una tarea de
+ * esfuerzo Grande con menos de 2 subtareas. Se puede guardar así (para no
+ * perderla), pero se avisa.
+ */
+export function formularioIncompleto(f) {
+  return f.tipo === 'Tarea' && Boolean(f.prioridad) && f.prioridad.esfuerzo === 'Grande' && subtareasDelFormulario(f).length < SUBTAREAS_MINIMAS;
+}
+
 /** ¿Se muestran fecha, hora y repetición para este formulario? */
 export function llevaFechaHora(f) {
   if (f.tipo !== 'Tarea') return true;
@@ -102,17 +128,9 @@ export function armarCompromiso(f, hoyISO = fechaLocalISO()) {
 
   // Si escribió una subtarea o pegó una lista y no pulsó "Agregar", se recoge
   // aquí para no perderla.
-  let subtareas = [];
-  if (esContenedor) {
-    subtareas = [...(f.subtareas || [])];
-    if (String(f.nuevaSubtareaTitulo || '').trim()) {
-      subtareas.push({ titulo: f.nuevaSubtareaTitulo.trim(), tiempo: minutosOTreinta(f.nuevaSubtareaTiempo) });
-    }
-    const tiempoLista = minutosOTreinta(f.tiempoLista);
-    subtareas.push(...lineasDe(f.textoLista).map((l) => ({ titulo: l, tiempo: tiempoLista })));
-    if (subtareas.length === 0) {
-      return { error: 'Agrega al menos una subtarea, o desmarca la casilla de dividir.' };
-    }
+  const subtareas = subtareasDelFormulario(f);
+  if (esContenedor && subtareas.length === 0) {
+    return { error: 'Agrega al menos una subtarea, o desmarca la casilla de dividir.' };
   }
 
   const confirmarRepeticion = !esContenedor && f.repeticion !== 'Ninguna' && !f.repeticionTieneFin;

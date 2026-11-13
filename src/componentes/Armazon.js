@@ -70,6 +70,9 @@ export function EncabezadoDia({ grupo, hoyISO, extra }) {
   } else if (grupo.tipo === 'sugeridas') {
     numero = 'Sugeridas';
     nombre = 'por puntaje';
+  } else if (grupo.tipo === 'seguimiento') {
+    numero = 'Seguimiento';
+    nombre = 'delegadas por revisar';
   } else if (grupo.tipo === 'sinFecha') {
     numero = 'Sin fecha';
   } else {

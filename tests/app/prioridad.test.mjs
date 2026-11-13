@@ -60,7 +60,7 @@ describe('tareas sugeridas', () => {
   });
 
   test('esfuerzo rápido y que te esperen desempatan', () => {
-    const lista = [tarea(1, C), tarea(2, C, { esfuerzo: 'Grande' }), tarea(3, C, { esfuerzo: 'Rápido' }), tarea(4, C, { me_esperan: true })];
+    const lista = [tarea(1, C), tarea(2, C, { esfuerzo: 'Medio' }), tarea(3, C, { esfuerzo: 'Rápido' }), tarea(4, C, { me_esperan: true })];
     assert.deepEqual(sugeridas(lista, HOY).map((t) => t.id), [3, 2, 4, 1]);
   });
 

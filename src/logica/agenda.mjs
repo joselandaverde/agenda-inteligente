@@ -5,6 +5,7 @@ const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', '
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
 import { compararPorOrden, estaCalificada } from './puntaje.mjs';
+import { estaDelegada, estaIncompleta, proximaSubtarea } from './seguimiento.mjs';
 
 /** Cuántas tareas sugeridas muestra Hoy: las cuatro de mayor puntaje (decisión #56). */
 export const SUGERIDAS_EN_HOY = 4;
@@ -82,7 +83,7 @@ export function formatoDuracion(minutos) {
  * ellas; un recordatorio no ocupa tiempo.
  */
 export function minutosDe(tarea, subtareas = []) {
-  if (!tarea || tarea.type === 'Recordatorio') return 0;
+  if (!tarea || tarea.type === 'Recordatorio' || estaDelegada(tarea)) return 0;
   if (tarea.type === 'Tarea' && subtareas.length > 0) {
     return subtareas.reduce((s, x) => s + (Number(x.time_estimated) || 0), 0);
   }
@@ -124,6 +125,7 @@ function ordenarDia(lista) {
  */
 export function repartir(tareas, hoyISO) {
   const vencidos = [];
+  const seguimiento = [];
   const porDia = new Map();
   const sinFecha = [];
   const hechos = [];
@@ -133,6 +135,17 @@ export function repartir(tareas, hoyISO) {
   };
 
   for (const t of tareas || []) {
+    // Una tarea delegada (bloque 3-A2) se ve como seguimiento: en vencidos solo
+    // si su fecha límite ya pasó; desde el día de su revisión, en seguimiento;
+    // antes, en el día de su revisión. Sin fecha de revisión, cuenta como hoy.
+    if (estaDelegada(t)) {
+      const limite = diaDe(t.deadline);
+      const revision = diaDe(t.revisar_el);
+      if (limite && limite < hoyISO) vencidos.push(t);
+      else if (!revision || revision <= hoyISO) seguimiento.push(t);
+      else agregar(revision, t);
+      continue;
+    }
     const dia = diaEfectivo(t);
     if (estaHecha(t)) {
       if (dia === hoyISO || diaDe(t.date_completed) === hoyISO) agregar(hoyISO, t);
@@ -145,6 +158,7 @@ export function repartir(tareas, hoyISO) {
   const dias = [...porDia.keys()].sort().map((clave) => ({ clave, tareas: ordenarDia(porDia.get(clave)) }));
   return {
     vencidos: [...vencidos].sort((x, y) => String(diaEfectivo(x)).localeCompare(String(diaEfectivo(y)))),
+    seguimiento: [...seguimiento].sort((x, y) => String(diaDe(x.revisar_el) || '').localeCompare(String(diaDe(y.revisar_el) || ''))),
     dias,
     sinFecha: [...sinFecha].sort((x, y) => nivelImportancia(x.priority) - nivelImportancia(y.priority)),
     hechos,
@@ -158,6 +172,7 @@ export function gruposDeHoy(tareas, hoyISO) {
   if (r.vencidos.length) grupos.push({ clave: 'vencidos', tipo: 'vencidos', tareas: r.vencidos });
   const hoy = r.dias.find((d) => d.clave === hoyISO);
   if (hoy) grupos.push({ clave: hoyISO, tipo: 'dia', tareas: hoy.tareas });
+  if (r.seguimiento.length) grupos.push({ clave: 'seguimiento', tipo: 'seguimiento', tareas: r.seguimiento });
   return grupos;
 }
 
@@ -166,6 +181,7 @@ export function gruposProximos(tareas, hoyISO) {
   const r = repartir(tareas, hoyISO);
   const grupos = [];
   if (r.vencidos.length) grupos.push({ clave: 'vencidos', tipo: 'vencidos', tareas: r.vencidos });
+  if (r.seguimiento.length) grupos.push({ clave: 'seguimiento', tipo: 'seguimiento', tareas: r.seguimiento });
   for (const d of r.dias) grupos.push({ clave: d.clave, tipo: 'dia', tareas: d.tareas });
   if (r.sinFecha.length) grupos.push({ clave: 'sin-fecha', tipo: 'sinFecha', tareas: r.sinFecha });
   if (r.hechos.length) grupos.push({ clave: 'hechos', tipo: 'hechos', tareas: r.hechos });
@@ -185,18 +201,66 @@ export function estaPospuesta(t, hoyISO) {
 }
 
 /**
- * Tareas sugeridas para empezar (bloques 1-A y 3-A): las abiertas de mayor
- * orden. El orden se calcula aquí con la fecha del día (puntaje.mjs); no se
- * usa el número guardado. No entran las concluidas, las que no tienen ningún
- * impacto calificado, las pospuestas con "retomar el" ni las que ya se
- * muestran en otra parte (`yaVisibles`). Con el mismo orden, la más antigua.
+ * Tareas sugeridas para empezar (bloques 1-A, 3-A y 3-A2): las abiertas de
+ * mayor orden. El orden se calcula aquí con la fecha del día (puntaje.mjs); no
+ * se usa el número guardado. No entran las concluidas, las que no tienen ningún
+ * impacto calificado, las pospuestas con "retomar el", las que ya se muestran
+ * en otra parte (`yaVisibles`), las delegadas (están en seguimiento) ni las de
+ * esfuerzo Grande que aún no tienen su plan de subtareas (`cuantasSubtareas`
+ * dice cuántas tiene cada una). Con el mismo orden, la más antigua.
  */
-export function sugeridas(tareas, hoyISO, cuantas = SUGERIDAS_EN_HOY, yaVisibles = []) {
+export function sugeridas(tareas, hoyISO, cuantas = SUGERIDAS_EN_HOY, yaVisibles = [], cuantasSubtareas = () => 0) {
   const fuera = new Set((yaVisibles || []).map((t) => t.id));
   return (tareas || [])
-    .filter((t) => t.type === 'Tarea' && !estaHecha(t) && estaCalificada(t) && !fuera.has(t.id) && !estaPospuesta(t, hoyISO))
+    .filter(
+      (t) =>
+        t.type === 'Tarea' && !estaHecha(t) && estaCalificada(t) && !fuera.has(t.id) && !estaPospuesta(t, hoyISO) &&
+        !estaDelegada(t) && !estaIncompleta(t, cuantasSubtareas(t.id))
+    )
     .sort(compararPorOrden(hoyISO))
     .slice(0, cuantas);
+}
+
+/**
+ * Lo que se sugiere, ya como pasos (D6): una tarea dividida en subtareas se
+ * sugiere por su siguiente subtarea pendiente, con el puntaje de la tarea; no
+ * por la tarea completa. Devuelve { tareas, pasos }: las tareas en orden y un
+ * Map(id de tarea → subtarea a hacer) con las que tienen paso. Una tarea sin
+ * subtareas, o con todas hechas, se sugiere ella misma.
+ */
+export function sugeridasConPasos(tareas, hoyISO, cuantas, yaVisibles, subtareasDe) {
+  const lista = sugeridas(tareas, hoyISO, cuantas, yaVisibles, (id) => (subtareasDe(id) || []).length);
+  const pasos = new Map();
+  for (const t of lista) {
+    const paso = proximaSubtarea(subtareasDe(t.id));
+    if (paso) pasos.set(t.id, paso);
+  }
+  return { tareas: lista, pasos };
+}
+
+/**
+ * Minutos que faltan en un grupo de la lista. En las sugeridas con pasos cuenta
+ * el tiempo del paso (la subtarea), no el de toda la tarea; lo hecho no cuenta.
+ */
+export function minutosPendientesDe(grupo, subtareasDe = () => []) {
+  let total = 0;
+  for (const t of grupo.tareas || []) {
+    if (t.state === 'Hecho') continue;
+    const paso = grupo.pasos && grupo.pasos.get(t.id);
+    total += paso ? Number(paso.time_estimated) || 0 : minutosDe(t, subtareasDe(t.id) || []);
+  }
+  return total;
+}
+
+/** Texto de una tarea delegada: "Delegada a Ana · revisar mañana". */
+export function textoDeDelegada(t, hoyISO) {
+  const quien = String(t.delegada_a || '').trim();
+  const revision = diaDe(t.revisar_el);
+  if (!revision) return 'Delegada a ' + quien + ' · sin fecha de revisión';
+  const p = partesDia(revision, hoyISO);
+  const cuando = p.relativo || 'el ' + p.numero + ' de ' + p.mes;
+  if (revision < hoyISO) return 'Delegada a ' + quien + ' · revisión pendiente desde ' + cuando;
+  return 'Delegada a ' + quien + ' · revisar ' + cuando;
 }
 
 /**

@@ -1512,3 +1512,28 @@ body {
 .ag-puntaje-vivo strong {
   font-size: var(--ag-t-l);
 }
+
+/* ---------- Incompleta y delegación (bloque 3-A2) ---------- */
+.ag-incompleta {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ag-alerta-suave);
+  color: var(--ag-alerta);
+  font-size: var(--ag-t-xs);
+  font-weight: 700;
+  line-height: 1.5;
+}
+.ag-delegacion {
+  margin-top: var(--ag-e2);
+}
+.ag-delegacion .ag-boton-secundario.ancho {
+  margin-top: var(--ag-e2);
+}
+.ag-delegada-texto {
+  margin: var(--ag-e1) 0 var(--ag-e2);
+  padding: var(--ag-e2) var(--ag-e3);
+  border-radius: var(--ag-radio);
+  background: var(--ag-acento-suave);
+  font-weight: 600;
+}

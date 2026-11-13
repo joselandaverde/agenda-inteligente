@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import Icono from '../componentes/Icono';
 import { Encabezado, Vacio } from '../componentes/Armazon';
 import { AvisoRespaldo } from './Respaldo';
-import { SUGERIDAS_EN_HOY, diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, nivelImportancia, partesDia, repartir, resumen, sugeridas } from '../logica/agenda.mjs';
+import { SUGERIDAS_EN_HOY, diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, minutosPendientesDe, nivelImportancia, partesDia, repartir, resumen, sugeridasConPasos, textoDeDelegada } from '../logica/agenda.mjs';
+import { LEYENDA_INCOMPLETA, estaDelegada, estaIncompleta } from '../logica/seguimiento.mjs';
 import { abiertosPorCategoria, filtrarPorCategoria, tonoDe } from '../logica/categorias.mjs';
 import { columnasDesde, cuandoEs, mesDe, subtareasDeTarjeta, tareasAbiertas } from '../logica/semana.mjs';
 
@@ -11,13 +12,16 @@ const mayuscula = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1);
 // Un compromiso dentro de una columna: enseña su hora, sus primeras subtareas,
 // su duración y su categoría. El título lo abre; el círculo lo marca.
 // Fuera de la columna de un día (`conDia`), la tarjeta dice también su fecha.
-function Tarjeta({ tarea, subtareas, categoria, indiceCategoria, hoyISO, conDia, alMarcar, alAbrir }) {
+// Con `paso` (bloque 3-A2) la tarjeta es esa subtarea de la tarea: se marca ella.
+function Tarjeta({ tarea, subtareas, categoria, indiceCategoria, hoyISO, conDia, alMarcar, alAbrir, paso, alMarcarPaso }) {
   const hecha = tarea.state === 'Hecho';
   const esTarea = tarea.type === 'Tarea';
   const importancia = tarea.priority || 'Media';
-  const duracion = formatoDuracion(minutosDe(tarea, subtareas));
+  const duracion = formatoDuracion(paso ? paso.time_estimated : minutosDe(tarea, subtareas));
+  const incompleta = estaIncompleta(tarea, subtareas.length);
+  const titulo = paso ? paso.title : tarea.title;
   const hora = tarea.date_promised ? horaCorta(tarea.date_promised) : '';
-  const { visibles, resto } = subtareasDeTarjeta(esTarea ? subtareas : []);
+  const { visibles, resto } = subtareasDeTarjeta(esTarea && !paso ? subtareas : []);
 
   const cuando = conDia ? cuandoEs(tarea, hoyISO) : null;
 
@@ -32,8 +36,11 @@ function Tarjeta({ tarea, subtareas, categoria, indiceCategoria, hoyISO, conDia,
     <article className={'ag-tarjeta' + (hecha ? ' hecha' : '')}>
       {cuando ? <span className={'ag-tarjeta-cuando' + (cuando.vencida ? ' vencida' : '')}>{cuando.texto}</span> : hora && <span className="ag-hora">{hora}</span>}
       <button type="button" className="ag-tarjeta-titulo" onClick={alAbrir}>
-        {tarea.title}
+        {titulo}
       </button>
+      {paso && <span className="ag-tarjeta-dato">De: {tarea.title}</span>}
+      {estaDelegada(tarea) && <span className="ag-tarjeta-dato">{textoDeDelegada(tarea, hoyISO)}</span>}
+      {incompleta && <span className="ag-incompleta">{LEYENDA_INCOMPLETA}</span>}
       {tarea.type === 'Reunión' && tarea.location && <span className="ag-tarjeta-dato">{tarea.location}</span>}
       {visibles.map((s) => (
         <span key={s.id} className={'ag-tarjeta-sub' + (s.state === 'Hecho' ? ' hecha' : '')}>
@@ -48,9 +55,9 @@ function Tarjeta({ tarea, subtareas, categoria, indiceCategoria, hoyISO, conDia,
           <button
             type="button"
             className="ag-marca-boton"
-            onClick={alMarcar}
+            onClick={paso ? alMarcarPaso : alMarcar}
             aria-pressed={hecha}
-            aria-label={(hecha ? 'Reabrir: ' : 'Marcar como hecha: ') + tarea.title + '. Importancia ' + importancia.toLowerCase()}
+            aria-label={(hecha ? 'Reabrir: ' : 'Marcar como hecha: ') + titulo + '. Importancia ' + importancia.toLowerCase()}
             title={'Importancia ' + importancia.toLowerCase()}
           >
             <span className={'ag-marca p' + nivelImportancia(importancia) + (hecha ? ' hecha' : '')}>{hecha && <Icono nombre="palomita" />}</span>
@@ -135,11 +142,13 @@ function ItemLateral({ texto, cantidad, activo, tono, alPulsar }) {
   );
 }
 
+const ROTULOS = { vencidos: ['Vencidos', 'Su día ya pasó'], sugeridas: ['Sugeridas', 'Por puntaje'], seguimiento: ['Seguimiento', 'Delegadas por revisar'] };
+
 const TITULOS = { semana: 'Semana', tareas: 'Tareas', sinFecha: 'Sin fecha', hechos: 'Hechas', categorias: 'Categorías' };
 
 // Vista de computadora: a la izquierda el mes y las categorías para filtrar;
 // al centro, un día por columna. Todo sale de los mismos datos que el teléfono.
-export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta, respaldo, administracion, alMarcar, alAbrir, alCapturar, alSalir }) {
+export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta, respaldo, administracion, alMarcar, alMarcarPaso, alAbrir, alCapturar, alSalir }) {
   const [ver, setVer] = useState('semana');
   const [filtro, setFiltro] = useState('');
   const [inicio, setInicio] = useState(hoyISO);
@@ -152,8 +161,9 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
   // Si la semana empieza hoy, primero las tareas sugeridas por puntaje (las
   // cuatro de mayor puntaje del día) que no estén ya en lo vencido ni en hoy.
   const yaALaVista = columnasDeDias.filter((c) => c.tipo === 'vencidos' || c.clave === hoyISO).flatMap((c) => c.tareas);
-  const tareasSugeridas = inicio === hoyISO ? sugeridas(visibles, hoyISO, SUGERIDAS_EN_HOY, yaALaVista) : [];
-  const columnas = tareasSugeridas.length > 0 ? [{ clave: 'sugeridas', tipo: 'sugeridas', tareas: tareasSugeridas }, ...columnasDeDias] : columnasDeDias;
+  // Una tarea dividida en subtareas se sugiere por su siguiente subtarea.
+  const sugerencia = inicio === hoyISO ? sugeridasConPasos(visibles, hoyISO, SUGERIDAS_EN_HOY, yaALaVista, subtareasDe) : { tareas: [], pasos: new Map() };
+  const columnas = sugerencia.tareas.length > 0 ? [{ clave: 'sugeridas', tipo: 'sugeridas', tareas: sugerencia.tareas, pasos: sugerencia.pasos }, ...columnasDeDias] : columnasDeDias;
   const diasConAlgo = new Set(reparto.dias.filter((d) => d.tareas.some((t) => t.state !== 'Hecho')).map((d) => d.clave));
   const categoriaFiltro = categorias.find((c) => c.id === filtroVigente) || null;
 
@@ -162,9 +172,11 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
   const listas = { tareas: pendientes, sinFecha: reparto.sinFecha, hechos: reparto.hechos };
   const vacios = { tareas: 'No hay tareas abiertas', sinFecha: 'Nada sin fecha', hechos: 'Aún no hay compromisos hechos' };
 
-  const tarjeta = (t) => (
+  const tarjeta = (t, paso) => (
     <Tarjeta
       key={t.id}
+      paso={paso}
+      alMarcarPaso={() => paso && alMarcarPaso(paso)}
       conDia={ver === 'tareas' || ver === 'hechos'}
       tarea={t}
       subtareas={subtareasDe(t.id)}
@@ -240,13 +252,13 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
           <div className="ag-columnas">
             {columnas.map((col) => {
               const r = resumen(col.tareas, subtareasDe);
-              const pendiente = formatoDuracion(resumen(col.tareas.filter((t) => t.state !== 'Hecho'), subtareasDe).totalMin);
+              const pendiente = formatoDuracion(minutosPendientesDe(col, subtareasDe));
               const p = col.tipo === 'dia' ? partesDia(col.clave, hoyISO) : null;
               return (
-                <section key={col.clave} className={'ag-columna' + (col.tipo === 'vencidos' ? ' alerta' : '')} aria-label={p ? fechaLarga(col.clave) : col.tipo === 'sugeridas' ? 'Sugeridas' : 'Vencidos'}>
+                <section key={col.clave} className={'ag-columna' + (col.tipo === 'vencidos' ? ' alerta' : '')} aria-label={p ? fechaLarga(col.clave) : ROTULOS[col.tipo][0]}>
                   <h2 className="ag-columna-enc">
-                    <b>{p ? mayuscula(p.nombre) : col.tipo === 'sugeridas' ? 'Sugeridas' : 'Vencidos'}</b>
-                    <span>{p ? p.numero + ' de ' + p.mes + (p.relativo ? ' · ' + p.relativo : '') : col.tipo === 'sugeridas' ? 'Por puntaje' : 'Su día ya pasó'}</span>
+                    <b>{p ? mayuscula(p.nombre) : ROTULOS[col.tipo][0]}</b>
+                    <span>{p ? p.numero + ' de ' + p.mes + (p.relativo ? ' · ' + p.relativo : '') : ROTULOS[col.tipo][1]}</span>
                   </h2>
                   <div className="ag-avance" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={r.porcentaje} aria-label="Avance del día">
                     <span style={{ width: r.porcentaje + '%' }} />
@@ -260,7 +272,7 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
                       {pendiente && <span className="ag-duracion">{pendiente}</span>}
                     </button>
                   )}
-                  {col.tareas.map(tarjeta)}
+                  {col.tareas.map((t) => tarjeta(t, col.pasos && col.pasos.get(t.id)))}
                 </section>
               );
             })}
@@ -270,7 +282,7 @@ export default function Semana({ tareas, subtareasDe, categorias, hoyISO, cuenta
         {listas[ver] && (
           <>
             {listas[ver].length === 0 && <Vacio titulo={vacios[ver]} pista={categoriaFiltro ? 'En la categoría ' + categoriaFiltro.name + '.' : ''} />}
-            <div className="ag-mosaico">{listas[ver].map(tarjeta)}</div>
+            <div className="ag-mosaico">{listas[ver].map((t) => tarjeta(t))}</div>
           </>
         )}
 
