@@ -1,0 +1,26 @@
+# Corre las pruebas automáticas en cada PR y en cada cambio de main
+# (bloque 0-D). No usa secretos ni se conecta a ninguna base: las pruebas son
+# de lógica y simulan lo que necesitan.
+name: Pruebas
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      # Instala exactamente lo que fija package-lock.json, sin ejecutar scripts de paquetes.
+      - run: npm ci --ignore-scripts
+      - run: npm run test:api

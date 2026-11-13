@@ -17,6 +17,7 @@ Un archivo `agenda-respaldo-AAAA-MM-DD.json` que la app descarga desde **Categor
 |---|---|
 | La cuenta y su contraseña | Se crea de nuevo en el panel de Supabase: Authentication › Users › Add user, con "Auto Confirm User" activado |
 | El contador de uso de la IA (`ai_usage`) | Se regenera solo con el uso |
+| El registro de acciones (`audit_log`) | No se recupera: es el historial de la base anterior. La restauración misma queda anotada en la base nueva |
 | La estructura de la base (tablas, reglas de seguridad) | Está en `supabase/migrations/`; se aplica en orden |
 | La configuración de Supabase, Vercel y GitHub | Está descrita en `supabase/README.md` y en la evidencia del bloque 0-B |
 | Las llaves (Supabase, AI Gateway) | Se generan de nuevo en cada servicio; nunca se guardan en el respaldo ni en el repositorio |

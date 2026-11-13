@@ -517,10 +517,32 @@ export function extraerToken(req) {
  *  - registrarUso(token, userId) -> { allowed, remaining, resetAt, modo }
  *  - llamarIA(prompt) -> string (contenido de la respuesta)
  *  - registrar(evento) -> void   (bitácora sin texto ni token)
+ *  - anotar(token, renglon) -> Promise<void>   (opcional: registro de acciones
+ *    del bloque 0-D; si falla, la respuesta al usuario no cambia)
  *  - ahora() -> Date
  *  - limites -> LIMITES
  *  - configuracion -> { ok, faltantes }  (opcional; si ok es false responde 503)
  */
+/**
+ * Renglón del registro de acciones (bloque 0-D) para una interpretación.
+ * Solo lleva el resultado, el motivo como código y la duración: nunca el
+ * texto del usuario ni la respuesta de la IA.
+ */
+export function renglonDeInterpretacion(evento, version) {
+  const e = evento || {};
+  const detail = {};
+  if (typeof e.motivo === 'string' && /^[a-z0-9_]{1,40}$/.test(e.motivo)) detail.motivo = e.motivo;
+  if (Number.isInteger(e.ms) && e.ms >= 0) detail.ms = e.ms;
+  return {
+    actor: 'servidor',
+    action: 'ia.interpretar',
+    resource: null,
+    result: ['ok', 'error', 'rechazado'].includes(e.resultado) ? e.resultado : 'error',
+    detail,
+    app_version: typeof version === 'string' && version ? version.slice(0, 60) : null,
+  };
+}
+
 export function crearHandler(deps) {
   const limites = { ...LIMITES, ...(deps.limites || {}) };
   const registrar = deps.registrar || (() => {});
@@ -529,10 +551,20 @@ export function crearHandler(deps) {
   return async function handler(req, res) {
     const inicio = Date.now();
     const evento = { evento: 'interpretar', usuario: null, resultado: null, motivo: null, ms: 0 };
-    const terminar = (status, cuerpo, resultado, motivo) => {
+    // Sesión ya verificada: con ella se anota en el registro de acciones.
+    let tokenVerificado = null;
+    const terminar = async (status, cuerpo, resultado, motivo) => {
       evento.resultado = resultado;
       evento.motivo = motivo || null;
       evento.ms = Date.now() - inicio;
+      if (deps.anotar && tokenVerificado && evento.usuario) {
+        try {
+          await deps.anotar(tokenVerificado, renglonDeInterpretacion(evento, deps.version));
+          evento.anotado = true;
+        } catch {
+          evento.anotado = false;
+        }
+      }
       registrar(evento);
       return res.status(status).json(cuerpo);
     };
@@ -562,6 +594,7 @@ export function crearHandler(deps) {
       return terminar(401, { error: 'No autorizado' }, 'rechazado', 'token_invalido');
     }
     evento.usuario = usuario.id;
+    tokenVerificado = token;
 
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const texto = typeof body.texto === 'string' ? body.texto.trim() : '';

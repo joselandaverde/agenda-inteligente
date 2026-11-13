@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Vacio } from '../componentes/Armazon';
 import { agregarCategoria, borrarCategoria, moverCategoria, guardarDescripcion } from '../datos/categorias.mjs';
 import { abiertosPorCategoria, opcionesDePosicion, textoAbiertos, tonoDe } from '../logica/categorias.mjs';
+import { anotarAccion } from '../datos/anotarAccion';
+import { ACCIONES } from '../logica/auditoria.mjs';
 
 // Categorías en orden de prioridad: agregar en la posición que se quiera,
 // subir y bajar, editar la descripción y borrar.
@@ -19,13 +21,13 @@ export default function Categorias({ cliente, categorias, tareas, alCambiar, alA
   async function ejecutar(operacion, alTerminar) {
     setOcupado(true);
     setMensaje('');
-    const { error } = await operacion();
+    const resultado = await operacion();
     setOcupado(false);
-    if (error) {
-      setMensaje('No se pudo guardar: ' + error.message);
+    if (resultado.error) {
+      setMensaje('No se pudo guardar: ' + resultado.error.message);
       return;
     }
-    if (alTerminar) alTerminar();
+    if (alTerminar) alTerminar(resultado);
     alCambiar();
   }
 
@@ -63,10 +65,16 @@ export default function Categorias({ cliente, categorias, tareas, alCambiar, alA
         : '¿Borrar la categoría "' + cat.name + '"?';
     if (!window.confirm(pregunta)) return;
     ejecutar(
-      () => borrarCategoria(cliente, categorias, cat),
-      () => {
+      async () => {
+        const r = await borrarCategoria(cliente, categorias, cat);
+        if (r.error) return r;
+        // El borrado queda en el registro; si no se pudo anotar, se avisa.
+        const nota = await anotarAccion(cliente, { accion: ACCIONES.CATEGORIA_BORRAR, recurso: 'projects:' + cat.id, detalle: { sin_categoria: cuantas } });
+        return { error: null, sinAnotar: Boolean(nota.error) };
+      },
+      (r) => {
         setAbiertaId(null);
-        alAvisar('Categoría "' + cat.name + '" borrada');
+        alAvisar('Categoría "' + cat.name + '" borrada' + (r && r.sinAnotar ? '; no se pudo anotar en Actividad' : ''));
       }
     );
   }

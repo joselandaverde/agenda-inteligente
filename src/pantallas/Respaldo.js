@@ -5,8 +5,12 @@ import React, { useRef, useState } from 'react';
 import { VERSION_APP } from '../version.mjs';
 import { armarRespaldo, nombreArchivo, leerArchivo, resumenCantidades, necesitaRespaldo, textoUltimoRespaldo, diasDesde } from '../logica/respaldo.mjs';
 import { leerDatos, revisarAntesDeRestaurar, restaurar } from '../datos/respaldo.mjs';
+import { anotarAccion, BASE_ACTUAL } from '../datos/anotarAccion';
+import { ACCIONES } from '../logica/auditoria.mjs';
 
 const TAMANO_MAXIMO = 20 * 1024 * 1024;
+// Se agrega al mensaje cuando la acción se hizo pero no quedó en el registro.
+const SIN_ANOTAR = ' No se pudo anotar en Actividad.';
 const NOMBRES_BASE = { produccion: 'producción', pruebas: 'pruebas' };
 
 // Fechas que se recuerdan en este equipo, por cuenta. Si el navegador no
@@ -85,14 +89,15 @@ export default function Respaldo({ cliente, ultimo, hayDatos, alDescargar, alRes
         decir('alerta', 'No se pudo leer la cuenta: ' + error.message);
         return;
       }
-      const respaldo = await armarRespaldo(datos, { versionApp: VERSION_APP, base: process.env.REACT_APP_BASE_DATOS || '' });
+      const respaldo = await armarRespaldo(datos, { versionApp: VERSION_APP, base: BASE_ACTUAL });
       if (respaldo.cantidades.projects + respaldo.cantidades.tasks + respaldo.cantidades.subtasks === 0) {
         decir('alerta', 'La cuenta está vacía: todavía no hay nada que respaldar.');
         return;
       }
       entregarArchivo(nombreArchivo(), JSON.stringify(respaldo, null, 2));
+      const nota = await anotarAccion(cliente, { accion: ACCIONES.RESPALDO_DESCARGAR, detalle: { cantidades: respaldo.cantidades, origen: BASE_ACTUAL } });
       alDescargar();
-      decir('bien', 'Respaldo descargado: ' + resumenCantidades(respaldo.cantidades) + '. Comprueba que el archivo quedó en tus descargas y guárdalo donde solo tú tengas acceso.');
+      decir('bien', 'Respaldo descargado: ' + resumenCantidades(respaldo.cantidades) + '. Comprueba que el archivo quedó en tus descargas y guárdalo donde solo tú tengas acceso.' + (nota.error ? SIN_ANOTAR : ''));
     } catch (e) {
       decir('alerta', 'No se pudo armar el respaldo: ' + (e && e.message ? e.message : 'error desconocido') + '.');
     } finally {
@@ -132,14 +137,24 @@ export default function Respaldo({ cliente, ultimo, hayDatos, alDescargar, alRes
 
   async function confirmar() {
     const { objeto } = pendiente;
+    // La restauración se anota siempre, haya salido bien o no, con la base
+    // de la que venía el archivo y la base en la que se restauró.
+    const anotarRestauracion = (resultado, motivo) =>
+      anotarAccion(cliente, {
+        accion: ACCIONES.RESPALDO_RESTAURAR,
+        resultado,
+        detalle: { cantidades: objeto.cantidades, origen: objeto.base, destino: BASE_ACTUAL, motivo },
+      });
     setOcupado('restaurar');
     try {
       const r = await restaurar(cliente, objeto);
       setPendiente(null);
-      if (r.ok) decir('bien', 'Restauración completa y comprobada: ' + resumenCantidades(r.cantidades) + '.');
+      const nota = await anotarRestauracion(r.ok ? 'ok' : 'error', r.ok ? undefined : 'no_completada');
+      if (r.ok) decir('bien', 'Restauración completa y comprobada: ' + resumenCantidades(r.cantidades) + '.' + (nota.error ? SIN_ANOTAR : ''));
       else decir('alerta', r.error);
     } catch (e) {
       setPendiente(null);
+      await anotarRestauracion('error', 'interrumpida');
       decir('alerta', 'La restauración se interrumpió. Revisa la cuenta antes de volver a intentar.');
     } finally {
       setOcupado('');

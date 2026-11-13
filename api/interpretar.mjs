@@ -90,9 +90,23 @@ async function llamarIA(prompt) {
   return (datos.choices && datos.choices[0] && datos.choices[0].message && datos.choices[0].message.content) || '';
 }
 
+// Registro de acciones (bloque 0-D): un renglón por interpretación, escrito
+// con la sesión del propio usuario, así que las reglas por fila aplican.
+async function anotar(token, renglon) {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: opcionesAuth,
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const { error } = await supabase.from('audit_log').insert([renglon]);
+  if (error) throw new Error(error.code || 'audit_error');
+}
+
+// Commit desplegado, para saber qué versión del código atendió la petición.
+const version = (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null;
+
 // Bitácora mínima: nunca incluye el texto del usuario ni el token.
 function registrar(evento) {
   console.info(JSON.stringify({ ...evento, ts: new Date().toISOString() }));
 }
 
-export default crearHandler({ verificarToken, registrarUso, llamarIA, registrar, limites, configuracion });
+export default crearHandler({ verificarToken, registrarUso, llamarIA, registrar, anotar, version, limites, configuracion });

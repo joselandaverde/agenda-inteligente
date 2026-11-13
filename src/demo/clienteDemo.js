@@ -42,7 +42,7 @@ function datosIniciales() {
     sub('s-5', 5, 'Enviar', 15, false),
   ];
 
-  return { projects, tasks, subtasks };
+  return { projects, tasks, subtasks, audit_log: [] };
 }
 
 // Abrir la demostración con "?vacia" en la dirección la deja sin datos: sirve
@@ -56,7 +56,7 @@ function empiezaVacia() {
 }
 
 export function crearClienteDemo() {
-  const tablas = empiezaVacia() ? { projects: [], tasks: [], subtasks: [] } : datosIniciales();
+  const tablas = empiezaVacia() ? { projects: [], tasks: [], subtasks: [], audit_log: [] } : datosIniciales();
   let contador = 1000;
   let sesion = { access_token: 'demostracion', user: { id: 'demo-usuario', email: 'demostracion@ejemplo.com' } };
   const oyentes = new Set();
@@ -100,11 +100,12 @@ export function crearClienteDemo() {
       });
     }
     if (c.rango) resultado = resultado.slice(c.rango[0], c.rango[1] + 1);
+    if (c.limite !== null) resultado = resultado.slice(0, c.limite);
     return { data: c.unico ? resultado[0] || null : resultado, error: null };
   }
 
   function from(nombre) {
-    const c = { op: 'select', filtros: [], listas: [], orden: null, rango: null, datos: null, unico: false };
+    const c = { op: 'select', filtros: [], listas: [], orden: null, rango: null, limite: null, datos: null, unico: false };
     const api = {
       select: () => api,
       insert: (datos) => { c.op = 'insert'; c.datos = datos; return api; },
@@ -113,6 +114,7 @@ export function crearClienteDemo() {
       eq: (col, val) => { c.filtros.push([col, val]); return api; },
       in: (col, vals) => { c.listas.push([col, vals]); return api; },
       range: (desde, hasta) => { c.rango = [desde, hasta]; return api; },
+      limit: (n) => { c.limite = n; return api; },
       order: (col, opciones = {}) => { c.orden = [col, opciones.ascending !== false]; return api; },
       single: () => { c.unico = true; return api; },
       then: (bien, mal) => Promise.resolve().then(() => ejecutar(nombre, c)).then(bien, mal),

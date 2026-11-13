@@ -7,8 +7,9 @@ El esquema de la app vive aquí como migraciones SQL. Una base nueva se crea
 |---|---|---|
 | 1 | `migrations/20261111_esquema_base.sql` | Tablas `projects`, `tasks` y `subtasks`, con seguridad por fila |
 | 2 | `migrations/20261103_ai_usage.sql` | Tabla `ai_usage` y función `ai_check_and_increment` (límite de uso de la IA) |
+| 3 | `migrations/20261112_audit_log.sql` | Tabla `audit_log`: registro de acciones delicadas, que el usuario puede leer y ampliar pero no alterar |
 
-Los dos archivos son independientes entre sí e idempotentes.
+Los archivos son independientes entre sí e idempotentes.
 
 ## Reglas
 
@@ -26,6 +27,13 @@ Los dos archivos son independientes entre sí e idempotentes.
 |---|---|---|
 | Producción | Proyecto nuevo (bloque 0-B) | Creado solo con estas migraciones |
 | Pruebas | Proyecto original | Esquema anterior a las migraciones; conserva políticas duplicadas y cinco tablas sin uso, que se revisan en el bloque 0-D |
+
+## Pruebas de permisos
+
+`tests/rls/pruebas_negativas.sql` comprueba, dentro de la base, que una cuenta no
+alcanza los datos de otra y que el registro de acciones no se puede alterar.
+Se ejecuta en la base de pruebas y no deja datos: termina con un error a
+propósito que deshace todo lo que escribió.
 
 ## Después de aplicar en una base nueva
 

@@ -955,6 +955,55 @@ body {
   text-decoration: none;
 }
 
+/* ---------- Actividad (bloque 0-D) ---------- */
+.ag-actividad {
+  margin-top: var(--ag-e4);
+  padding-top: var(--ag-e3);
+  border-top: 1px solid var(--ag-linea);
+  font-family: var(--ag-letra);
+}
+.ag-actividad h3 {
+  margin: 0 0 var(--ag-e1);
+  font-size: var(--ag-t-m);
+  color: var(--ag-texto);
+}
+.ag-actividad-lista {
+  list-style: none;
+  margin: var(--ag-e2) 0 0;
+  padding: 0;
+}
+.ag-actividad-lista li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ag-e3);
+  padding: var(--ag-e2) 0;
+  border-bottom: 1px solid var(--ag-linea);
+  font-size: var(--ag-t-s);
+  line-height: 1.35;
+}
+.ag-actividad-cuando {
+  flex: none;
+  width: 118px;
+  color: var(--ag-tenue);
+  font-variant-numeric: tabular-nums;
+}
+.ag-actividad-texto {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ag-actividad-texto strong {
+  display: block;
+  font-size: 13.5px;
+  color: var(--ag-texto);
+}
+.ag-actividad-texto span {
+  color: var(--ag-tenue);
+}
+.ag-actividad-lista li.alerta strong {
+  color: var(--ag-alerta);
+}
+
 /* ---------- Carga inicial ---------- */
 .ag-cargando {
   margin: 0;
