@@ -2,6 +2,7 @@
 // el calendario del mes. Funciones puras, con pruebas.
 import { diaEfectivo, fechaLocalISO, horaCorta, nivelImportancia, partesDia, repartir, sumarDias } from './agenda.mjs';
 import { compararPorOrden, estaCalificada } from './puntaje.mjs';
+import { estaDelegada } from './seguimiento.mjs';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const dos = (n) => String(n).padStart(2, '0');
@@ -19,6 +20,7 @@ export function columnasDesde(tareas, hoyISO, inicioISO = hoyISO, dias = 7) {
   const columnas = [];
 
   if (inicio === hoyISO && r.vencidos.length) columnas.push({ clave: 'vencidos', tipo: 'vencidos', tareas: r.vencidos });
+  if (inicio === hoyISO && r.seguimiento.length) columnas.push({ clave: 'seguimiento', tipo: 'seguimiento', tareas: r.seguimiento });
   for (let i = 0; i < dias; i++) {
     const iso = sumarDias(inicio, i);
     columnas.push({ clave: iso, tipo: 'dia', tareas: porDia.get(iso) || [] });
@@ -59,8 +61,8 @@ export function subtareasDeTarjeta(subtareas, maximo = 3) {
 }
 
 /**
- * Todas las tareas abiertas (no reuniones ni recordatorios), tengan fecha o
- * no. Primero las que tienen puntaje, de mayor a menor orden (calculado con la
+ * Todas las tareas abiertas (no reuniones ni recordatorios ni las delegadas,
+ * que están en seguimiento), tengan fecha o no. Primero las que tienen puntaje, de mayor a menor orden (calculado con la
  * fecha del día, bloque 3-A); después, las que no lo tienen: las más
  * importantes primero; con la misma importancia, la de fecha más cercana y al
  * final las que no tienen fecha.
@@ -69,7 +71,7 @@ export function tareasAbiertas(tareas, hoyISO = fechaLocalISO()) {
   const lejos = '9999-99-99';
   const porOrden = compararPorOrden(hoyISO);
   return (tareas || [])
-    .filter((t) => t.type === 'Tarea' && t.state !== 'Hecho')
+    .filter((t) => t.type === 'Tarea' && t.state !== 'Hecho' && !estaDelegada(t))
     .sort((x, y) => {
       const cx = estaCalificada(x);
       const cy = estaCalificada(y);
