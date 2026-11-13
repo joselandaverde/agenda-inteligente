@@ -219,7 +219,24 @@ export function aplicarInterpretacion(datosIA, opciones = {}) {
  */
 export function formularioInterpretado(hoyISO, datosIA, opciones = {}) {
   const { cambios, advertencias, abrirMas } = aplicarInterpretacion(datosIA, opciones);
-  return { formulario: { ...formularioVacio(hoyISO), ...cambios }, advertencias, abrirMas };
+  const formulario = { ...formularioVacio(hoyISO), ...cambios };
+  // Captura desde la columna de un día: si el dictado no dijo fecha, se queda
+  // la de la columna.
+  if (opciones.fechaInicial && !cambios.fecha) {
+    formulario.fecha = opciones.fechaInicial;
+    formulario.tieneFechaHora = true;
+  }
+  return { formulario, advertencias, abrirMas };
+}
+
+/**
+ * Formulario para capturar desde un día concreto (la columna de un día en la
+ * vista de computadora): el compromiso nace con esa fecha. Sin día, es el
+ * formulario vacío de siempre.
+ */
+export function formularioDelDia(hoyISO, fechaISO) {
+  if (!fechaISO) return formularioVacio(hoyISO);
+  return { ...formularioVacio(fechaISO), tieneFechaHora: true };
 }
 
 // Datos que viven dentro de "Más opciones" en la captura.

@@ -6,7 +6,7 @@ import { guardarCompromiso } from '../datos/compromisos';
 import { fechaLocalISO } from '../logica/agenda.mjs';
 import {
   TIPOS, REPETICIONES, IMPORTANCIAS, CANALES, HORAS, MINUTOS,
-  formularioVacio, armarCompromiso, formularioInterpretado, mensajeDeRespuesta, esDudoso, lineasDe, llevaFechaHora,
+  formularioDelDia, armarCompromiso, formularioInterpretado, mensajeDeRespuesta, esDudoso, lineasDe, llevaFechaHora,
 } from '../logica/compromiso.mjs';
 
 // Un renglón del formulario: ícono, nombre del dato y su control a la derecha.
@@ -29,8 +29,10 @@ function Interruptor({ activo, alCambiar, etiqueta }) {
   );
 }
 
-export default function Capturar({ categorias, alGuardar, alCerrar }) {
-  const [f, setF] = useState(() => formularioVacio(fechaLocalISO()));
+// `fechaInicial` (AAAA-MM-DD) llega cuando se captura desde la columna de un
+// día en la vista de computadora: el compromiso nace con esa fecha.
+export default function Capturar({ categorias, fechaInicial, alGuardar, alCerrar }) {
+  const [f, setF] = useState(() => formularioDelDia(fechaLocalISO(), fechaInicial));
   const [textoLibre, setTextoLibre] = useState('');
   const [interpretando, setInterpretando] = useState(false);
   const [mensajeIA, setMensajeIA] = useState('');
@@ -90,7 +92,7 @@ export default function Capturar({ categorias, alGuardar, alCerrar }) {
 
       // Cada interpretación reemplaza el formulario completo: no se mezcla
       // con lo que dejó la anterior ni con lo tecleado antes.
-      const { formulario, advertencias, abrirMas } = formularioInterpretado(fechaLocalISO(), await respuesta.json(), { categorias });
+      const { formulario, advertencias, abrirMas } = formularioInterpretado(fechaLocalISO(), await respuesta.json(), { categorias, fechaInicial });
       setF(formulario);
       setDudosos(advertencias);
       setMasOpciones(abrirMas);

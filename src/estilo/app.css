@@ -954,3 +954,449 @@ body {
   font-weight: 600;
   text-decoration: none;
 }
+
+/* ---------- Carga inicial ---------- */
+.ag-cargando {
+  margin: 0;
+  padding: 40px var(--ag-e4);
+  font-family: var(--ag-letra);
+  font-size: var(--ag-t-m);
+  color: var(--ag-tenue);
+}
+
+/* ---------- Categorías (entrega I-4) ---------- */
+.ag-cats {
+  font-family: var(--ag-letra);
+}
+.ag-cat-nueva {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ag-e2);
+  padding: var(--ag-e3);
+  border-radius: 14px;
+  background: var(--ag-superficie);
+}
+.ag-cat-nueva > .ag-campo {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.ag-cat-posicion {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ag-e2);
+  font-size: var(--ag-t-s);
+  color: var(--ag-tenue);
+}
+.ag-cat {
+  border-bottom: 1px solid var(--ag-linea);
+}
+.ag-cat-fila {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-e2);
+  min-height: 56px;
+}
+.ag-cat-cuerpo {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--ag-toque);
+  padding: 0;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.ag-cat-cuerpo .ag-punto {
+  width: 10px;
+  height: 10px;
+}
+.ag-cat-orden {
+  flex: none;
+  min-width: 26px;
+  font-size: var(--ag-t-s);
+  font-weight: 700;
+  color: var(--ag-tenue);
+  font-variant-numeric: tabular-nums;
+}
+.ag-cat-texto {
+  flex: 1;
+  min-width: 0;
+}
+.ag-cat-edicion {
+  padding: 0 0 var(--ag-e4);
+}
+.ag-cat-edicion .ag-etq {
+  margin-top: var(--ag-e1);
+}
+.ag-cat-edicion textarea {
+  resize: vertical;
+}
+
+/* ---------- Vista de computadora (entrega I-4) ----------
+   Las reglas de pantalla ancha usan 900px, el mismo ancho con el que
+   Armazon.js decide mostrar esta vista. */
+.ag-app.ancha {
+  max-width: none;
+  padding-bottom: 0;
+}
+.ag-pc {
+  display: grid;
+  grid-template-columns: var(--ag-ancho-lateral) minmax(0, 1fr);
+  min-height: 100vh;
+}
+.ag-lateral {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  box-sizing: border-box;
+  height: 100vh;
+  overflow-y: auto;
+  padding: var(--ag-e4) var(--ag-e3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--ag-superficie);
+  border-right: 1px solid var(--ag-linea);
+}
+.ag-lateral-marca {
+  padding: 0 var(--ag-e2) var(--ag-e3);
+  font-size: var(--ag-t-l);
+  font-weight: 800;
+}
+.ag-lateral-etq {
+  padding: var(--ag-e4) var(--ag-e2) var(--ag-e1);
+  font-size: var(--ag-t-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ag-tenue);
+}
+.ag-lateral-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-e2);
+  width: 100%;
+  min-height: 34px;
+  padding: 0 var(--ag-e2);
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ag-texto);
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.ag-lateral-item span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ag-lateral-item em {
+  font-style: normal;
+  font-size: var(--ag-t-xs);
+  color: var(--ag-tenue);
+  font-variant-numeric: tabular-nums;
+}
+.ag-lateral-item:hover {
+  background: var(--ag-linea);
+}
+.ag-lateral-item[aria-current='true'] {
+  background: var(--ag-fondo);
+  font-weight: 800;
+}
+.ag-lateral-pie {
+  margin-top: auto;
+  padding: var(--ag-e4) var(--ag-e2) 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ag-e2);
+  font-size: var(--ag-t-xs);
+  color: var(--ag-tenue);
+  overflow-wrap: anywhere;
+}
+
+/* Calendario del mes */
+.ag-cal {
+  padding: 0 2px;
+}
+.ag-cal-mes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--ag-t-s);
+  font-weight: 800;
+}
+.ag-cal-mes button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ag-tenue);
+  font-size: var(--ag-t-l);
+  line-height: 1;
+  cursor: pointer;
+}
+.ag-cal-mes button:hover {
+  background: var(--ag-linea);
+}
+.ag-cal-dias {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  justify-items: center;
+  row-gap: 2px;
+  margin-top: var(--ag-e1);
+}
+.ag-cal-letra {
+  font-size: var(--ag-t-xs);
+  color: var(--ag-tenue);
+  line-height: 22px;
+}
+.ag-cal-dias button {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ag-texto);
+  font-size: var(--ag-t-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.ag-cal-dias button:hover:not(:disabled) {
+  background: var(--ag-linea);
+}
+.ag-cal-dias button.fuera,
+.ag-cal-dias button:disabled {
+  color: var(--ag-apagado);
+}
+.ag-cal-dias button:disabled {
+  cursor: default;
+}
+.ag-cal-dias button.con-algo::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--ag-tenue);
+}
+.ag-cal-dias button.elegido {
+  box-shadow: inset 0 0 0 2px var(--ag-acento);
+  font-weight: 800;
+}
+.ag-cal-dias button.hoy {
+  background: var(--ag-acento);
+  color: var(--ag-sobre-acento);
+  font-weight: 800;
+}
+.ag-cal-dias button.hoy.con-algo::after {
+  background: var(--ag-sobre-acento);
+}
+
+/* Centro: encabezado, columnas por día y mosaico */
+.ag-pc-centro {
+  min-width: 0;
+  padding-bottom: var(--ag-e4);
+}
+.ag-pc-cab {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-e2);
+  padding-right: var(--ag-e4);
+}
+.ag-pc-cab .ag-encabezado {
+  flex: 1;
+  min-width: 0;
+}
+.ag-pc-centro .ag-recordatorio {
+  max-width: var(--ag-ancho-lectura);
+}
+.ag-columnas {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--ag-ancho-columna);
+  gap: var(--ag-e3);
+  align-items: start;
+  padding: var(--ag-e2) var(--ag-e4) var(--ag-e4);
+  overflow-x: auto;
+}
+.ag-columna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ag-e2);
+  min-width: 0;
+}
+.ag-columna-enc {
+  margin: 0;
+  font-weight: 400;
+}
+.ag-columna-enc b {
+  display: block;
+  font-size: var(--ag-t-l);
+  font-weight: 800;
+  line-height: 1.1;
+}
+.ag-columna-enc span {
+  font-size: var(--ag-t-s);
+  color: var(--ag-tenue);
+}
+.ag-columna.alerta .ag-columna-enc b {
+  color: var(--ag-alerta);
+}
+.ag-columna .ag-avance {
+  margin-top: 0;
+}
+.ag-columna-agregar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ag-e2);
+  min-height: 36px;
+  padding: 0 var(--ag-e2) 0 var(--ag-e3);
+  border: 1px dashed var(--ag-apagado);
+  border-radius: 10px;
+  background: none;
+  color: var(--ag-tenue);
+  font-size: var(--ag-t-s);
+  cursor: pointer;
+}
+.ag-columna-agregar > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ag-columna-agregar .ag-icono {
+  width: 15px;
+  height: 15px;
+  color: var(--ag-acento);
+}
+.ag-columna-agregar:hover {
+  border-color: var(--ag-acento);
+  color: var(--ag-acento);
+}
+.ag-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px var(--ag-e3) var(--ag-e2);
+  border: 1px solid var(--ag-linea);
+  border-radius: var(--ag-radio);
+  background: var(--ag-fondo);
+}
+.ag-tarjeta .ag-hora {
+  font-size: var(--ag-t-xs);
+  line-height: 1.1;
+}
+.ag-tarjeta-titulo {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.ag-tarjeta-titulo:hover {
+  color: var(--ag-acento);
+}
+.ag-tarjeta-dato,
+.ag-tarjeta-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ag-tenue);
+  overflow-wrap: anywhere;
+}
+.ag-tarjeta-dato .ag-icono {
+  width: 13px;
+  height: 13px;
+}
+.ag-tarjeta-sub .ag-marca {
+  width: 14px;
+  height: 14px;
+  border-width: 1.5px;
+}
+.ag-tarjeta-sub .ag-marca .ag-icono {
+  width: 8px;
+  height: 8px;
+}
+.ag-tarjeta-sub.hecha {
+  color: var(--ag-apagado);
+  text-decoration: line-through;
+}
+.ag-tarjeta-pie {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-e2);
+  min-height: 28px;
+  font-size: var(--ag-t-xs);
+  color: var(--ag-tenue);
+}
+.ag-tarjeta-pie .ag-marca-boton {
+  width: 32px;
+  height: 32px;
+  margin: -2px -5px -2px -6px;
+}
+.ag-tarjeta-pie .ag-marca {
+  width: 20px;
+  height: 20px;
+}
+.ag-tarjeta.hecha .ag-tarjeta-titulo {
+  color: var(--ag-tenue);
+  font-weight: 500;
+  text-decoration: line-through;
+}
+.ag-mosaico {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--ag-ancho-columna), 1fr));
+  gap: var(--ag-e3);
+  align-items: start;
+  padding: var(--ag-e2) var(--ag-e4) var(--ag-e4);
+}
+.ag-pc-centro .ag-vacio {
+  max-width: var(--ag-ancho-lectura);
+}
+.ag-pc-administracion {
+  max-width: var(--ag-ancho-lectura);
+  padding: var(--ag-e2) var(--ag-e4) var(--ag-e4);
+}
+
+/* En pantalla ancha, captura y detalle se abren como panel a la derecha y el
+   aviso breve baja a la esquina, porque no hay barra inferior. */
+@media (min-width: 900px) {
+  .ag-hoja {
+    display: flex;
+    justify-content: flex-end;
+    background: var(--ag-velo);
+  }
+  .ag-hoja-dentro {
+    width: var(--ag-ancho-panel);
+    max-width: 100%;
+    min-height: 100%;
+    height: max-content;
+    margin: 0;
+    background: var(--ag-fondo);
+  }
+  .ag-aviso {
+    bottom: var(--ag-e4);
+  }
+}

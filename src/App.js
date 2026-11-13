@@ -3,35 +3,37 @@ import { supabase } from './supabaseClient';
 import Login from './Login';
 import Renglon from './componentes/Renglon';
 import Capturar from './pantallas/Capturar';
+import Categorias from './pantallas/Categorias';
 import Detalle from './pantallas/Detalle';
 import Respaldo, { AvisoRespaldo, leerMarcas, guardarMarca } from './pantallas/Respaldo';
-import { Encabezado, EncabezadoDia, BarraNavegacion, BotonDictar, TiraSemana, Vacio } from './componentes/Armazon';
+import Semana from './pantallas/Semana';
+import { Encabezado, EncabezadoDia, BarraNavegacion, BotonDictar, TiraSemana, Vacio, usarComputadora } from './componentes/Armazon';
+import { alternarHecho } from './datos/compromisos';
 import { fechaLocalISO, fechaLarga, formatoDuracion, gruposDeHoy, gruposProximos, resumen } from './logica/agenda.mjs';
 import { debeAvisar } from './logica/respaldo.mjs';
 
+// Armazón de la app: sesión, carga de datos y navegación. Cada pantalla vive
+// en su archivo. En pantallas anchas se muestra la vista de computadora.
 export default function App() {
   const [sesion, setSesion] = useState(null);
   const [cargando, setCargando] = useState(true);
 
   const [categorias, setCategorias] = useState([]);
-  const [nuevaCategoria, setNuevaCategoria] = useState('');
-  const [nuevaPosicion, setNuevaPosicion] = useState('1');
   const [tareas, setTareas] = useState([]);
-
-  const [editandoId, setEditandoId] = useState(null);
-  const [editContext, setEditContext] = useState('');
-
-  // Subtareas de todos los compromisos y compromiso abierto en detalle
   const [subtareas, setSubtareas] = useState([]);
-  const [detalleId, setDetalleId] = useState(null);
 
-  // Armazon nuevo (bloque I): pantalla visible, hoja de captura y aviso breve
+  // Pantalla visible en el teléfono, compromiso abierto, captura y aviso breve.
+  // `captura` es null si está cerrada; abierta, lleva la fecha con la que nace
+  // el compromiso (la de una columna) o null.
   const [pantalla, setPantalla] = useState('hoy');
-  const [capturaAbierta, setCapturaAbierta] = useState(false);
+  const [detalleId, setDetalleId] = useState(null);
+  const [captura, setCaptura] = useState(null);
   const [aviso, setAviso] = useState('');
 
   // Respaldo (bloque 0-C): fechas recordadas en este equipo
   const [marcas, setMarcas] = useState({ ultimo: null, pospuesto: null });
+
+  const computadora = usarComputadora();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -39,11 +41,9 @@ export default function App() {
       setCargando(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_evento, sesionNueva) => {
-        setSesion(sesionNueva);
-      }
-    );
+    const { data: listener } = supabase.auth.onAuthStateChange((_evento, sesionNueva) => {
+      setSesion(sesionNueva);
+    });
 
     return () => listener.subscription.unsubscribe();
   }, []);
@@ -58,142 +58,35 @@ export default function App() {
   }, [sesion]);
 
   async function cargarTareas() {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('date_promised', { ascending: true });
+    const { data, error } = await supabase.from('tasks').select('*').order('date_promised', { ascending: true });
     if (!error) setTareas(data);
   }
 
   async function cargarCategorias() {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .order('priority_order', { ascending: true });
+    const { data, error } = await supabase.from('projects').select('*').order('priority_order', { ascending: true });
     if (!error) setCategorias(data);
   }
 
-  // Cargar TODAS las subtareas (de todas las tareas) para calcular avances
+  // Todas las subtareas, de todos los compromisos, para calcular avances
   async function cargarSubtareas() {
-    const { data, error } = await supabase
-      .from('subtasks')
-      .select('*')
-      .order('orden', { ascending: true });
+    const { data, error } = await supabase.from('subtasks').select('*').order('orden', { ascending: true });
     if (!error) setSubtareas(data);
+  }
+
+  function cargarTodo() {
+    cargarCategorias();
+    cargarTareas();
+    cargarSubtareas();
   }
 
   // Subtareas de una tarea concreta, ordenadas
   function subtareasDe(taskId) {
-    return subtareas
-      .filter((s) => s.task_id === taskId)
-      .sort((a, b) => a.orden - b.orden);
+    return subtareas.filter((s) => s.task_id === taskId).sort((a, b) => a.orden - b.orden);
   }
 
-  async function agregarCategoria() {
-    if (!nuevaCategoria.trim()) return;
-
-    const total = categorias.length;
-    let pos = parseInt(nuevaPosicion, 10);
-    if (isNaN(pos) || pos < 1) pos = 1;
-    if (pos > total + 1) pos = total + 1;
-
-    const aRecorrer = categorias.filter((c) => c.priority_order >= pos);
-    for (const c of aRecorrer) {
-      await supabase
-        .from('projects')
-        .update({ priority_order: c.priority_order + 1 })
-        .eq('id', c.id);
-    }
-
-    const { error } = await supabase
-      .from('projects')
-      .insert([{ name: nuevaCategoria.trim(), priority_order: pos }]);
-
-    if (!error) {
-      setNuevaCategoria('');
-      setNuevaPosicion('1');
-      cargarCategorias();
-    }
-  }
-
-  async function borrarCategoria(id, nombre, ordenBorrado) {
-    const conEstaCategoria = tareas.filter((t) => t.project_id === id);
-    if (conEstaCategoria.length > 0) {
-      const ok = window.confirm(
-        'La categoría "' +
-          nombre +
-          '" tiene ' +
-          conEstaCategoria.length +
-          ' tarea(s). Si la borras, esas tareas quedarán sin categoría. ¿Confirmas?'
-      );
-      if (!ok) return;
-    }
-
-    const { error } = await supabase.from('projects').delete().eq('id', id);
-    if (!error) {
-      const aSubir = categorias.filter((c) => c.priority_order > ordenBorrado);
-      for (const c of aSubir) {
-        await supabase
-          .from('projects')
-          .update({ priority_order: c.priority_order - 1 })
-          .eq('id', c.id);
-      }
-      if (editandoId === id) setEditandoId(null);
-      cargarCategorias();
-      cargarTareas();
-    }
-  }
-
-  async function moverCategoria(cat, direccion) {
-    const ordenActual = cat.priority_order;
-    const ordenVecina =
-      direccion === 'subir' ? ordenActual - 1 : ordenActual + 1;
-
-    const vecina = categorias.find((c) => c.priority_order === ordenVecina);
-    if (!vecina) return;
-
-    await supabase
-      .from('projects')
-      .update({ priority_order: ordenVecina })
-      .eq('id', cat.id);
-    await supabase
-      .from('projects')
-      .update({ priority_order: ordenActual })
-      .eq('id', vecina.id);
-
-    cargarCategorias();
-  }
-
-  function abrirEdicion(cat) {
-    if (editandoId === cat.id) {
-      setEditandoId(null);
-      return;
-    }
-    setEditandoId(cat.id);
-    setEditContext(cat.context || '');
-  }
-
-  async function guardarCategoria(id) {
-    const { error } = await supabase
-      .from('projects')
-      .update({ context: editContext || null })
-      .eq('id', id);
-    if (!error) {
-      setEditandoId(null);
-      cargarCategorias();
-    }
-  }
-
-  // Marcar concluida / reabrir (rápido, sin expandir)
+  // Marcar como hecha o reabrir, desde la lista
   async function alternarConcluida(t) {
-    const nuevoEstado = t.state === 'Hecho' ? 'Pendiente' : 'Hecho';
-    const { error } = await supabase
-      .from('tasks')
-      .update({
-        state: nuevoEstado,
-        date_completed: nuevoEstado === 'Hecho' ? new Date().toISOString() : null,
-      })
-      .eq('id', t.id);
+    const { error } = await alternarHecho(supabase, t);
     if (!error) cargarTareas();
   }
 
@@ -201,28 +94,24 @@ export default function App() {
     await supabase.auth.signOut();
   }
 
+  function mostrarAviso(texto) {
+    setAviso(texto);
+    setTimeout(() => setAviso(''), 3500);
+  }
+
   if (cargando) {
-    return <p style={{ padding: '40px', fontFamily: 'Arial' }}>Cargando...</p>;
+    return <p className="ag-cargando">Cargando...</p>;
   }
 
   if (!sesion) {
     return <Login />;
   }
 
-  const opcionesPosicion = [];
-  for (let i = 1; i <= categorias.length + 1; i++)
-    opcionesPosicion.push(String(i));
-
-  // Datos para las pantallas nuevas: todo se calcula con lo que ya existe.
+  // Datos para las pantallas: todo se calcula con lo que ya existe.
   const hoyISO = fechaLocalISO();
-  const gruposHoy = gruposDeHoy(tareas, hoyISO);
-  const gruposVisibles = pantalla === 'hoy' ? gruposHoy : gruposProximos(tareas, hoyISO);
-  const resumenHoy = resumen((gruposHoy.find((g) => g.clave === hoyISO) || { tareas: [] }).tareas, subtareasDe);
-  const abiertos = tareas.filter((t) => t.state !== 'Hecho').length;
   const tareaAbierta = detalleId ? tareas.find((t) => t.id === detalleId) || null : null;
-  const diasConAlgo = new Set(gruposProximos(tareas, hoyISO).filter((g) => g.tipo === 'dia').map((g) => g.clave));
-
   const hayDatos = categorias.length + tareas.length + subtareas.length > 0;
+  const avisarRespaldo = debeAvisar(marcas.ultimo, marcas.pospuesto, new Date(), hayDatos);
 
   function marcarRespaldo(cual) {
     const iso = new Date().toISOString();
@@ -230,10 +119,80 @@ export default function App() {
     setMarcas((m) => ({ ...m, [cual]: iso }));
   }
 
-  function mostrarAviso(texto) {
-    setAviso(texto);
-    setTimeout(() => setAviso(''), 3500);
+  // Categorías y respaldo: lo mismo en el teléfono y en la computadora.
+  const administracion = (
+    <>
+      <Categorias cliente={supabase} categorias={categorias} tareas={tareas} alCambiar={cargarTodo} alAvisar={mostrarAviso} />
+      <Respaldo cliente={supabase} ultimo={marcas.ultimo} hayDatos={hayDatos} alDescargar={() => marcarRespaldo('ultimo')} alRestaurar={cargarTodo} />
+    </>
+  );
+
+  // Hojas que se abren encima de cualquier vista: captura, detalle y aviso.
+  const encima = (
+    <>
+      {captura && (
+        <Capturar
+          categorias={categorias}
+          fechaInicial={captura.fecha}
+          alCerrar={() => setCaptura(null)}
+          alGuardar={(texto) => {
+            cargarTareas();
+            cargarSubtareas();
+            setCaptura(null);
+            mostrarAviso(texto);
+          }}
+        />
+      )}
+      {tareaAbierta && (
+        <Detalle
+          key={tareaAbierta.id}
+          tarea={tareaAbierta}
+          subtareas={subtareasDe(tareaAbierta.id)}
+          categorias={categorias}
+          hoyISO={hoyISO}
+          alCerrar={() => setDetalleId(null)}
+          alCambiar={() => {
+            cargarTareas();
+            cargarSubtareas();
+          }}
+          alAvisar={mostrarAviso}
+        />
+      )}
+      {aviso && (
+        <div className="ag-aviso" role="status">
+          {aviso}
+        </div>
+      )}
+    </>
+  );
+
+  if (computadora) {
+    return (
+      <div className="ag-app ancha">
+        <Semana
+          tareas={tareas}
+          subtareasDe={subtareasDe}
+          categorias={categorias}
+          hoyISO={hoyISO}
+          cuenta={sesion.user.email}
+          respaldo={{ mostrar: avisarRespaldo, ultimo: marcas.ultimo, alPosponer: () => marcarRespaldo('pospuesto') }}
+          administracion={administracion}
+          alMarcar={alternarConcluida}
+          alAbrir={(t) => setDetalleId(t.id)}
+          alCapturar={(fecha) => setCaptura({ fecha })}
+          alSalir={salir}
+        />
+        {encima}
+      </div>
+    );
   }
+
+  const gruposHoy = gruposDeHoy(tareas, hoyISO);
+  const proximos = gruposProximos(tareas, hoyISO);
+  const gruposVisibles = pantalla === 'hoy' ? gruposHoy : proximos;
+  const resumenHoy = resumen((gruposHoy.find((g) => g.clave === hoyISO) || { tareas: [] }).tareas, subtareasDe);
+  const abiertos = tareas.filter((t) => t.state !== 'Hecho').length;
+  const diasConAlgo = new Set(proximos.filter((g) => g.tipo === 'dia').map((g) => g.clave));
 
   return (
     <div className="ag-app">
@@ -251,10 +210,7 @@ export default function App() {
         nota={
           pantalla === 'hoy' && resumenHoy.total > 0
             ? (resumenHoy.totalMin > 0
-                ? (formatoDuracion(resumenHoy.hechoMin) || '0:00') +
-                  ' de ' +
-                  formatoDuracion(resumenHoy.totalMin) +
-                  ' planeadas · '
+                ? (formatoDuracion(resumenHoy.hechoMin) || '0:00') + ' de ' + formatoDuracion(resumenHoy.totalMin) + ' planeadas · '
                 : '') +
               resumenHoy.hechos +
               ' de ' +
@@ -264,220 +220,10 @@ export default function App() {
         }
       />
 
-      {/* Captura de un compromiso nuevo: pantalla propia */}
-      {capturaAbierta && (
-        <Capturar
-          categorias={categorias}
-          alCerrar={() => setCapturaAbierta(false)}
-          alGuardar={(texto) => {
-            cargarTareas();
-            cargarSubtareas();
-            setCapturaAbierta(false);
-            setAviso(texto);
-            setTimeout(() => setAviso(''), 3500);
-          }}
-        />
-      )}
-
-      {/* Gestión de categorías */}
+      {/* Categorías, respaldo y cuenta */}
       {pantalla === 'categorias' && (
         <div className="ag-pantalla">
-      <div
-        style={{
-          marginTop: '30px',
-          padding: '15px',
-          backgroundColor: '#f0f4f8',
-          borderRadius: '6px',
-        }}
-      >
-        <h3 style={{ marginTop: 0 }}>Mis categorías (orden de prioridad)</h3>
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            type="text"
-            value={nuevaCategoria}
-            onChange={(e) => setNuevaCategoria(e.target.value)}
-            placeholder="Nueva categoría..."
-            style={{ padding: '8px', fontSize: '15px', marginRight: '10px', marginBottom: '8px' }}
-          />
-          <label style={{ fontSize: '14px', marginRight: '6px' }}>
-            Posición:
-          </label>
-          <select
-            value={nuevaPosicion}
-            onChange={(e) => setNuevaPosicion(e.target.value)}
-            style={{ padding: '8px', fontSize: '15px', marginRight: '10px', marginBottom: '8px' }}
-          >
-            {opcionesPosicion.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={agregarCategoria}
-            style={{ padding: '8px 16px', fontSize: '15px', marginBottom: '8px' }}
-          >
-            Agregar
-          </button>
-        </div>
-
-        <div style={{ marginTop: '15px' }}>
-          {categorias.map((c, indice) => (
-            <div
-              key={c.id}
-              style={{
-                backgroundColor: 'white',
-                borderRadius: '4px',
-                marginBottom: '6px',
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '8px',
-                }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center' }}>
-                  <span style={{ display: 'flex', flexDirection: 'column', marginRight: '8px' }}>
-                    <button
-                      onClick={() => moverCategoria(c, 'subir')}
-                      disabled={indice === 0}
-                      style={{
-                        fontSize: '11px',
-                        lineHeight: '1',
-                        padding: '1px 5px',
-                        border: 'none',
-                        borderRadius: '3px',
-                        cursor: indice === 0 ? 'default' : 'pointer',
-                        backgroundColor: indice === 0 ? '#f0f0f0' : '#dde7f5',
-                        color: indice === 0 ? '#bbb' : '#333',
-                        marginBottom: '2px',
-                      }}
-                    >
-                      ▲
-                    </button>
-                    <button
-                      onClick={() => moverCategoria(c, 'bajar')}
-                      disabled={indice === categorias.length - 1}
-                      style={{
-                        fontSize: '11px',
-                        lineHeight: '1',
-                        padding: '1px 5px',
-                        border: 'none',
-                        borderRadius: '3px',
-                        cursor:
-                          indice === categorias.length - 1 ? 'default' : 'pointer',
-                        backgroundColor:
-                          indice === categorias.length - 1 ? '#f0f0f0' : '#dde7f5',
-                        color: indice === categorias.length - 1 ? '#bbb' : '#333',
-                      }}
-                    >
-                      ▼
-                    </button>
-                  </span>
-                  <strong style={{ color: '#007bff', marginRight: '8px' }}>
-                    {c.priority_order}º
-                  </strong>
-                  {c.name}
-                </span>
-                <div>
-                  <button
-                    onClick={() => abrirEdicion(c)}
-                    style={{
-                      padding: '4px 10px',
-                      fontSize: '13px',
-                      backgroundColor: '#dde7f5',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      marginRight: '6px',
-                    }}
-                  >
-                    {editandoId === c.id ? 'Cerrar' : 'Editar'}
-                  </button>
-                  <button
-                    onClick={() => borrarCategoria(c.id, c.name, c.priority_order)}
-                    style={{
-                      padding: '4px 10px',
-                      fontSize: '13px',
-                      backgroundColor: '#fdd',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Borrar
-                  </button>
-                </div>
-              </div>
-
-              {editandoId === c.id && (
-                <div
-                  style={{
-                    padding: '12px',
-                    backgroundColor: '#f7faff',
-                    borderTop: '1px solid #e0e8f0',
-                  }}
-                >
-                  <label
-                    style={{
-                      fontSize: '13px',
-                      color: '#555',
-                      display: 'block',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    Contexto de la categoría:
-                  </label>
-                  <textarea
-                    value={editContext}
-                    onChange={(e) => setEditContext(e.target.value)}
-                    placeholder="Describe de qué va esta categoría, sus objetivos, situación..."
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      fontSize: '14px',
-                      minHeight: '70px',
-                      fontFamily: 'Arial',
-                      boxSizing: 'border-box',
-                      marginBottom: '10px',
-                    }}
-                  />
-                  <button
-                    onClick={() => guardarCategoria(c.id)}
-                    style={{
-                      padding: '8px 16px',
-                      fontSize: '14px',
-                      backgroundColor: '#007bff',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Guardar contexto
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-          <Respaldo
-            cliente={supabase}
-            ultimo={marcas.ultimo}
-            hayDatos={hayDatos}
-            alDescargar={() => marcarRespaldo('ultimo')}
-            alRestaurar={() => {
-              cargarCategorias();
-              cargarTareas();
-              cargarSubtareas();
-            }}
-          />
+          {administracion}
           <div className="ag-cuenta">
             <span>{sesion.user.email}</span>
             <button type="button" className="ag-boton-secundario" onClick={salir}>
@@ -487,7 +233,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Lista de compromisos, agrupada por dia */}
+      {/* Lista de compromisos, agrupada por día */}
       {pantalla !== 'categorias' && (
         <div className="ag-lista">
           {pantalla === 'proximos' && (
@@ -500,28 +246,15 @@ export default function App() {
               }}
             />
           )}
-          {pantalla === 'hoy' && debeAvisar(marcas.ultimo, marcas.pospuesto, new Date(), hayDatos) && (
-            <AvisoRespaldo
-              ultimo={marcas.ultimo}
-              alIr={() => setPantalla('categorias')}
-              alPosponer={() => marcarRespaldo('pospuesto')}
-            />
+          {pantalla === 'hoy' && avisarRespaldo && (
+            <AvisoRespaldo ultimo={marcas.ultimo} alIr={() => setPantalla('categorias')} alPosponer={() => marcarRespaldo('pospuesto')} />
           )}
           {gruposVisibles.length === 0 && (
-            <Vacio
-              titulo={pantalla === 'hoy' ? 'Nada para hoy' : 'No hay compromisos'}
-              pista="Toca el botón redondo para dictar o escribir uno."
-            />
+            <Vacio titulo={pantalla === 'hoy' ? 'Nada para hoy' : 'No hay compromisos'} pista="Toca el botón redondo para dictar o escribir uno." />
           )}
           {gruposVisibles.map((g) => (
             <section key={g.clave} id={'grupo-' + g.clave} className="ag-grupo">
-              <EncabezadoDia
-                grupo={g}
-                hoyISO={hoyISO}
-                extra={formatoDuracion(
-                  resumen(g.tareas.filter((x) => x.state !== 'Hecho'), subtareasDe).totalMin
-                )}
-              />
+              <EncabezadoDia grupo={g} hoyISO={hoyISO} extra={formatoDuracion(resumen(g.tareas.filter((x) => x.state !== 'Hecho'), subtareasDe).totalMin)} />
               {g.tareas.map((t) => (
                 <div key={t.id} className="ag-item">
                   <Renglon
@@ -541,33 +274,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Detalle de un compromiso: pantalla propia */}
-      {tareaAbierta && (
-        <Detalle
-          key={tareaAbierta.id}
-          tarea={tareaAbierta}
-          subtareas={subtareasDe(tareaAbierta.id)}
-          categorias={categorias}
-          hoyISO={hoyISO}
-          alCerrar={() => setDetalleId(null)}
-          alCambiar={() => {
-            cargarTareas();
-            cargarSubtareas();
-          }}
-          alAvisar={mostrarAviso}
-        />
-      )}
-
-      {aviso && (
-        <div className="ag-aviso" role="status">
-          {aviso}
-        </div>
-      )}
-      <BotonDictar
-        alPulsar={() => {
-          setCapturaAbierta(true);
-        }}
-      />
+      {encima}
+      <BotonDictar alPulsar={() => setCaptura({ fecha: null })} />
       <BarraNavegacion
         pantalla={pantalla}
         alCambiar={(p) => {
