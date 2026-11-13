@@ -2,11 +2,14 @@ import React from 'react';
 import Icono from './Icono';
 import { IMPACTOS, CAMPOS_IMPACTO, URGENCIAS, ESFUERZOS, ME_ESPERAN } from '../logica/prioridad.mjs';
 
-function Fila({ icono, etiqueta, children }) {
+function Fila({ icono, etiqueta, ayuda, children }) {
   return (
     <div className="ag-opcion">
       <Icono nombre={icono} />
-      <span className="ag-opcion-etq">{etiqueta}</span>
+      <span className="ag-opcion-etq">
+        {etiqueta}
+        {ayuda && <small className="ag-opcion-ayuda">{ayuda}</small>}
+      </span>
       <span className="ag-opcion-valor">{children}</span>
     </div>
   );
@@ -20,10 +23,10 @@ function Fila({ icono, etiqueta, children }) {
 export default function CamposPrioridad({ valores, alCambiar, conFechaLimite = false }) {
   return (
     <>
-      <p className="ag-ayuda">Califica cuánto aporta esta tarea en cada área: nulo, moderado o alto. Lo que dejes sin calificar cuenta como nulo.</p>
+      <p className="ag-ayuda">¿Cuánto aporta esta tarea en cada área? Nulo es nada, moderado es algo y alto es mucho. Lo que dejes sin calificar cuenta como nulo.</p>
       <div className="ag-opciones">
         {CAMPOS_IMPACTO.map((c) => (
-          <Fila key={c.clave} icono="lista" etiqueta={c.nombre}>
+          <Fila key={c.clave} icono="lista" etiqueta={c.nombre} ayuda={c.ayuda}>
             <select className="ag-campo" aria-label={'Impacto: ' + c.nombre + '. ' + c.ayuda} title={c.ayuda} value={valores[c.clave]} onChange={(ev) => alCambiar({ [c.clave]: ev.target.value })}>
               {IMPACTOS.map((i) => (
                 <option key={i.valor} value={i.valor}>
@@ -33,7 +36,7 @@ export default function CamposPrioridad({ valores, alCambiar, conFechaLimite = f
             </select>
           </Fila>
         ))}
-        <Fila icono="bandera" etiqueta="Urgencia">
+        <Fila icono="bandera" etiqueta="Urgencia" ayuda="Fecha dura: no se puede mover. Ventana: oportunidad con plazo. Sin fecha: sin presión">
           <select className="ag-campo" aria-label="Urgencia" value={valores.urgencia} onChange={(ev) => alCambiar({ urgencia: ev.target.value })}>
             <option value="">Sin definir</option>
             {URGENCIAS.map((u) => (
@@ -48,7 +51,7 @@ export default function CamposPrioridad({ valores, alCambiar, conFechaLimite = f
             <input className="ag-campo" type="date" aria-label="Fecha límite" value={valores.fechaLimite} onChange={(ev) => alCambiar({ fechaLimite: ev.target.value })} />
           </Fila>
         )}
-        <Fila icono="cronometro" etiqueta="Esfuerzo">
+        <Fila icono="cronometro" etiqueta="Esfuerzo" ayuda="Rápido: menos de 30 min. Medio: horas. Grande: semanas">
           <select className="ag-campo" aria-label="Esfuerzo" value={valores.esfuerzo} onChange={(ev) => alCambiar({ esfuerzo: ev.target.value })}>
             <option value="">Sin definir</option>
             {ESFUERZOS.map((e) => (
@@ -58,7 +61,7 @@ export default function CamposPrioridad({ valores, alCambiar, conFechaLimite = f
             ))}
           </select>
         </Fila>
-        <Fila icono="personas" etiqueta="¿Te esperan?">
+        <Fila icono="personas" etiqueta="¿Te esperan?" ayuda="Alguien depende de que lo hagas (solo desempata)">
           <select className="ag-campo" aria-label="¿Te esperan?" value={valores.meEsperan} onChange={(ev) => alCambiar({ meEsperan: ev.target.value })}>
             {ME_ESPERAN.map((o) => (
               <option key={o.valor} value={o.valor}>
@@ -67,7 +70,7 @@ export default function CamposPrioridad({ valores, alCambiar, conFechaLimite = f
             ))}
           </select>
         </Fila>
-        <Fila icono="reloj" etiqueta="Avance (%)">
+        <Fila icono="reloj" etiqueta="Avance (%)" ayuda="Qué parte ya está hecha">
           <input className="ag-campo corto" type="number" inputMode="numeric" min="0" max="100" aria-label="Avance en porcentaje" value={valores.avance} onChange={(ev) => alCambiar({ avance: ev.target.value })} placeholder="0" />
         </Fila>
       </div>

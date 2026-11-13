@@ -13,10 +13,10 @@ export const IMPACTOS = [
 
 /** Los cuatro impactos: clave del formulario, columna de la base y cómo se nombran. */
 export const CAMPOS_IMPACTO = [
-  { clave: 'generar', columna: 'impact_generar', nombre: 'Generar', ayuda: 'Ingresos o ahorro' },
-  { clave: 'proteger', columna: 'impact_proteger', nombre: 'Proteger', ayuda: 'Evitar una pérdida o un riesgo' },
-  { clave: 'politico', columna: 'impact_politico', nombre: 'Político', ayuda: 'Posición, marca, relaciones clave' },
-  { clave: 'personal', columna: 'impact_personal', nombre: 'Personal', ayuda: 'Salud, familia, bienestar' },
+  { clave: 'generar', columna: 'impact_generar', nombre: 'Ganar dinero', ayuda: 'Ingresos o ahorro (E+ en tu Excel)' },
+  { clave: 'proteger', columna: 'impact_proteger', nombre: 'Evitar pérdidas', ayuda: 'Multas, riesgos o problemas que esto previene (E−)' },
+  { clave: 'politico', columna: 'impact_politico', nombre: 'Imagen y relaciones', ayuda: 'Jefes, clientes, reputación, posición (P, Político)' },
+  { clave: 'personal', columna: 'impact_personal', nombre: 'Salud y familia', ayuda: 'Bienestar tuyo y de los tuyos (Personal)' },
 ];
 
 export { URGENCIAS, ESFUERZOS };

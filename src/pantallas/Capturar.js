@@ -443,6 +443,17 @@ export default function Capturar({ categorias, fechaInicial, alGuardar, alCerrar
           {mensaje}
         </p>
       )}
+      {puntaje && (
+        <p className="ag-puntaje-vivo" role="status">
+          {puntaje.puntaje !== null ? (
+            <>
+              Puntaje de esta tarea: <strong>{puntaje.puntaje}</strong>
+            </>
+          ) : (
+            'Puntaje: aún sin calificar (en "Más opciones", Prioridad)'
+          )}
+        </p>
+      )}
       <button type="button" className="ag-boton principal" onClick={crear} disabled={guardando}>
         {guardando ? 'Guardando...' : 'Crear ' + f.tipo.toLowerCase()}
       </button>
