@@ -8,6 +8,8 @@ import {
 import { diaDe, fechaLarga, formatoDuracion, horaCorta, minutosDe, nivelImportancia, partesDia } from '../logica/agenda.mjs';
 import { IMPORTANCIAS, HORAS, MINUTOS, lineasDe } from '../logica/compromiso.mjs';
 import { edicionDe, armarActualizacion, minutosValidos, vecinaDe } from '../logica/detalle.mjs';
+import { anotarAccion } from '../datos/anotarAccion';
+import { ACCIONES } from '../logica/auditoria.mjs';
 
 function Opcion({ icono, etiqueta, children }) {
   return (
@@ -61,14 +63,14 @@ export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar
   async function ejecutar(accion, alTerminar) {
     setOcupado(true);
     setMensaje('');
-    const { error } = await accion();
+    const resultado = await accion();
     setOcupado(false);
-    if (error) {
-      setMensaje('No se pudo guardar: ' + error.message);
+    if (resultado.error) {
+      setMensaje('No se pudo guardar: ' + resultado.error.message);
       return;
     }
     alCambiar();
-    if (alTerminar) alTerminar();
+    if (alTerminar) alTerminar(resultado);
   }
 
   const guardar = () =>
@@ -86,9 +88,15 @@ export default function Detalle({ tarea, subtareas, categorias, hoyISO, alCerrar
     const ok = window.confirm('¿Borrar "' + tarea.title + '"? Esta acción no se puede deshacer.');
     if (!ok) return;
     ejecutar(
-      () => borrarCompromiso(supabase, tarea.id),
-      () => {
-        alAvisar('Compromiso borrado');
+      async () => {
+        const r = await borrarCompromiso(supabase, tarea.id);
+        if (r.error) return r;
+        // El borrado queda en el registro; si no se pudo anotar, se avisa.
+        const nota = await anotarAccion(supabase, { accion: ACCIONES.COMPROMISO_BORRAR, recurso: 'tasks:' + tarea.id, detalle: { tipo: tarea.type } });
+        return { error: null, sinAnotar: Boolean(nota.error) };
+      },
+      (r) => {
+        alAvisar(r && r.sinAnotar ? 'Compromiso borrado; no se pudo anotar en Actividad' : 'Compromiso borrado');
         alCerrar();
       }
     );

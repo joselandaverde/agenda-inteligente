@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import Login from './Login';
 import Renglon from './componentes/Renglon';
+import Actividad from './pantallas/Actividad';
 import Capturar from './pantallas/Capturar';
 import Categorias from './pantallas/Categorias';
 import Detalle from './pantallas/Detalle';
@@ -32,6 +33,10 @@ export default function App() {
 
   // Respaldo (bloque 0-C): fechas recordadas en este equipo
   const [marcas, setMarcas] = useState({ ultimo: null, pospuesto: null });
+
+  // Registro de acciones (bloque 0-D): cambia cuando algo pudo anotarse, para
+  // que la lista de Actividad se vuelva a leer.
+  const [senalActividad, setSenalActividad] = useState(0);
 
   const computadora = usarComputadora();
 
@@ -77,6 +82,7 @@ export default function App() {
     cargarCategorias();
     cargarTareas();
     cargarSubtareas();
+    setSenalActividad((n) => n + 1);
   }
 
   // Subtareas de una tarea concreta, ordenadas
@@ -96,6 +102,7 @@ export default function App() {
 
   function mostrarAviso(texto) {
     setAviso(texto);
+    setSenalActividad((n) => n + 1);
     setTimeout(() => setAviso(''), 3500);
   }
 
@@ -117,13 +124,15 @@ export default function App() {
     const iso = new Date().toISOString();
     guardarMarca(sesion.user.id, cual, iso);
     setMarcas((m) => ({ ...m, [cual]: iso }));
+    setSenalActividad((n) => n + 1);
   }
 
-  // Categorías y respaldo: lo mismo en el teléfono y en la computadora.
+  // Categorías, respaldo y actividad: lo mismo en el teléfono y en la computadora.
   const administracion = (
     <>
       <Categorias cliente={supabase} categorias={categorias} tareas={tareas} alCambiar={cargarTodo} alAvisar={mostrarAviso} />
       <Respaldo cliente={supabase} ultimo={marcas.ultimo} hayDatos={hayDatos} alDescargar={() => marcarRespaldo('ultimo')} alRestaurar={cargarTodo} />
+      <Actividad cliente={supabase} senal={senalActividad} />
     </>
   );
 
